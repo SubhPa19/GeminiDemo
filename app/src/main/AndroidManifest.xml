@@ -12,7 +12,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.GeminiDemo">
         <activity
-            android:name=".MainActivity"
+            android:name="com.example.geminidemo.MainActivity"
             android:exported="true"
             android:theme="@style/Theme.GeminiDemo">
             <intent-filter>
