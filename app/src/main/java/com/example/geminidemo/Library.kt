@@ -229,12 +229,6 @@ object Library {
             author = Author("J.K. Rowling"),
             genre = Genre.Fiction.Fantasy,
             price = 1999
-        ),
-        Book(
-            title = "Harry Potter and the Deathly Hallows",
-            author = Author("J.K. Rowling"),
-            genre = Genre.Fiction.Fantasy,
-            price = 1374
         )
     )
 }
