@@ -22,7 +22,13 @@ jobs:
 
       - name: Install dependencies
         run: pip install requests
-
+        
+      - name: Show repository files (Debugging)
+        run: |
+          pwd
+          ls -la
+          ls -la .github/ || echo ".github folder not found!"
+          
       - name: Generate and Update PR Summary
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
