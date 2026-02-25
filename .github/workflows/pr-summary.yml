@@ -1,0 +1,32 @@
+name: AI PR Summarizer
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize] # 'synchronize' triggers when a new commit is pushed
+
+permissions:
+  pull-requests: write 
+  contents: read
+
+jobs:
+  summarize-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Generate and Update PR Summary
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: python .github/scripts/pr_summarizer.py
