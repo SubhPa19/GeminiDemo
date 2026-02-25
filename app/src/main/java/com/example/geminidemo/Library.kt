@@ -2,18 +2,7 @@ package com.example.geminidemo
 
 object Library {
     val books: List<Book> = listOf(
-        Book(
-            title = "Zero to One",
-            authors = listOf(Author("Peter Thiel"), Author("Blake Masters")),
-            genre = Genre.NonFiction.Business,
-            price = 1963
-        ),
-        Book(
-            title = "Why We Sleep: Unlocking the Power of Sleep and Dreams",
-            author = Author("Matthew Walker"),
-            genre = Genre.NonFiction.SelfHelp,
-            price = 1796
-        ),
+
         Book(
             title = "Utopia for Realists: How We Can Build the Ideal World",
             author = Author("Rutger Bregman"),
