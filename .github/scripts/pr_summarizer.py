@@ -2,34 +2,49 @@ import os
 import requests
 import sys
 
+# Get environment variables from GitHub Actions
 repo = os.getenv("REPO")
 pr_number = os.getenv("PR_NUMBER")
 github_token = os.getenv("GITHUB_TOKEN")
 gemini_api_key = os.getenv("GEMINI_API_KEY")
+# Configurable path to your checklist file
+checklist_path = os.getenv("CHECKLIST_PATH", ".github/checklist.md") 
 
 if not all([repo, pr_number, github_token, gemini_api_key]):
     print("Missing required environment variables.")
     sys.exit(1)
 
-# --- Fetch PR Metadata to get Author and Reviewers ---
+# API Headers
 api_headers = {
     "Authorization": f"Bearer {github_token}",
     "Accept": "application/vnd.github.v3+json"
 }
 pr_metadata_url = f"https://api.github.com/repos/{repo}/pulls/{pr_number}"
+
+# --- NEW: Fetch PR Metadata to get base branch and users ---
 pr_meta = requests.get(pr_metadata_url, headers=api_headers).json()
-
-# Safely extract the author's username
 pr_author = pr_meta.get("user", {}).get("login", "Developer")
-
-# Safely extract any requested reviewers
 requested_reviewers = [rev['login'] for rev in pr_meta.get("requested_reviewers", [])]
+base_branch = pr_meta.get("base", {}).get("ref", "main") # Branch PR is merging INTO
 
-# Format the tags for the comment
+# Format mentions for the footer
 mentions = f"@{pr_author}"
 if requested_reviewers:
     mentions += "\n*CC Reviewers:* " + " ".join([f"@{rev}" for rev in requested_reviewers])
-# -----------------------------------------------------------
+
+# --- NEW FEATURE 1: Fetch the Team Checklist (Definition of Done) ---
+checklist_url = f"https://api.github.com/repos/{repo}/contents/{checklist_path}?ref={base_branch}"
+checklist_content = ""
+try:
+    checklist_raw_response = requests.get(checklist_url, headers={"Authorization": f"Bearer {github_token}", "Accept": "application/vnd.github.v3.raw"})
+    if checklist_raw_response.status_code == 200:
+        checklist_content = checklist_raw_response.text
+        print(f"Successfully loaded checklist from {checklist_path}")
+    else:
+        print(f"Checklist not found at {checklist_path}. Using general best practices.")
+except Exception as e:
+    print(f"Error fetching checklist: {e}. Proceeding without it.")
+# ---------------------------------------------------------------------
 
 # Fetch the PR Diff
 diff_headers = {
@@ -41,7 +56,7 @@ diff = requests.get(pr_metadata_url, headers=diff_headers).text
 if len(diff) > 50000:
     diff = diff[:50000] + "\n\n...[Diff truncated due to length]..."
 
-# --- THE PROFESSIONAL PROMPT ---
+# --- UPDATED PROFESSIONAL PROMPT with DoD and Suggestions ---
 prompt = f"""
 You are an expert, professional Android Developer and Senior Kotlin code reviewer. Analyze the following GitHub Pull Request diff and provide a highly accurate, objective, and constructive review formatted exactly with these headings. 
 
@@ -51,30 +66,28 @@ You are an expert, professional Android Developer and Senior Kotlin code reviewe
 ### 🔑 Key Changes
 (Provide bullet points of the most important technical changes.)
 
-### 🤖 Android & Kotlin Feedback
-(Critique the code constructively for Android-specific best practices. Point out:
-- Kotlin optimizations (e.g., scoping functions, null safety, idiomatic usage)
-- Coroutine/Flow usage (e.g., proper Dispatchers, structured concurrency)
-- Jetpack Compose performance (e.g., recomposition issues, state hoisting)
-- Lifecycle, Context, or Memory management issues.
-If the code is clean, state "Code adheres to Android and Kotlin best practices.")
+### ✅ Definition of Done Check (DoD)
+(Compare the changes in the diff against the provided Team Checklist. For each numbered point in the checklist, state objectively if the PR appears to adhere to it based on the diff. If no specific checklist content is provided below, state "General industry best practices applied.")
+
+[Team Checklist Context Start]
+{checklist_content if checklist_content else "No specific checklist provided."}
+[Team Checklist Context End]
+
+### 🤖 Android & Kotlin Feedback & Suggestions
+(Critique the code objectively for Android-specific best practices, focusing on performance, Kotlin idiomatic usage, and memory management.
+ If you identify inefficient code that can be improved, provide the critique and then **provide the actual corrected code block in Markdown format so the developer can copy-paste it directly**. Use specific file paths/line references from the diff where possible.)
 
 ### ⚠️ Risks
 (Highlight potential risks such as unhandled exceptions, memory leaks, or main thread blocks. If none, state "No obvious risks detected.")
 
-### 🧪 Suggested Test Cases
-(Suggest specific scenarios to test, focusing on edge cases like device rotation, network states, and nullability.)
-
 ### 🛑 Merge Verdict
-(Choose exactly ONE of the following verdicts based on your review, and add a brief, professional justification):
-- 🟢 **LGTM (Looks Good To Merge)**: [Your professional justification]
-- 🟡 **Needs Review (Revisions Recommended)**: [Your professional justification]
-- 🔴 **HARD STOP (Do not merge until addressed)**: [Your professional justification]
+(Choose exactly ONE: 🟢 **LGTM (Looks Good To Merge)**, 🟡 **Needs Review (Revisions Recommended)**, or 🔴 **HARD STOP (Do not merge until addressed)**, and add a brief professional justification based on findings.)
 
 Here is the diff:
 {diff}
 """
 
+# Call Gemini API
 gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_api_key}"
 payload = {"contents": [{"parts": [{"text": prompt}]}]}
 
@@ -85,10 +98,11 @@ except Exception as e:
     print(f"Failed to generate summary: {e}")
     sys.exit(1)
 
-# --- Appending mentions and a professional footer ---
+# Appending mentions and professional footer
 bot_marker = ""
 final_comment_body = f"{ai_summary}\n\n---\nHey {mentions}, your automated PR review is ready.\n\n{bot_marker}\n*⏳ Updated automatically based on the latest commits.*"
 
+# Post or Update Comment
 comments_url = f"https://api.github.com/repos/{repo}/issues/{pr_number}/comments"
 comment_headers = {
     "Authorization": f"Bearer {github_token}",
