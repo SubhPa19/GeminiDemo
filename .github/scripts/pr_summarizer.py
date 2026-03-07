@@ -7,7 +7,6 @@ repo = os.getenv("REPO")
 pr_number = os.getenv("PR_NUMBER")
 github_token = os.getenv("GITHUB_TOKEN")
 gemini_api_key = os.getenv("GEMINI_API_KEY")
-# Configurable path to your checklist file
 checklist_path = os.getenv("CHECKLIST_PATH", ".github/checklist.md") 
 
 if not all([repo, pr_number, github_token, gemini_api_key]):
@@ -21,18 +20,18 @@ api_headers = {
 }
 pr_metadata_url = f"https://api.github.com/repos/{repo}/pulls/{pr_number}"
 
-# --- NEW: Fetch PR Metadata to get base branch and users ---
+# Fetch PR Metadata
 pr_meta = requests.get(pr_metadata_url, headers=api_headers).json()
 pr_author = pr_meta.get("user", {}).get("login", "Developer")
 requested_reviewers = [rev['login'] for rev in pr_meta.get("requested_reviewers", [])]
-base_branch = pr_meta.get("base", {}).get("ref", "main") # Branch PR is merging INTO
+base_branch = pr_meta.get("base", {}).get("ref", "main")
 
 # Format mentions for the footer
 mentions = f"@{pr_author}"
 if requested_reviewers:
     mentions += "\n*CC Reviewers:* " + " ".join([f"@{rev}" for rev in requested_reviewers])
 
-# --- NEW FEATURE 1: Fetch the Team Checklist (Definition of Done) ---
+# Feature 1: Fetch the Team Checklist (Definition of Done)
 checklist_url = f"https://api.github.com/repos/{repo}/contents/{checklist_path}?ref={base_branch}"
 checklist_content = ""
 try:
@@ -44,7 +43,6 @@ try:
         print(f"Checklist not found at {checklist_path}. Using general best practices.")
 except Exception as e:
     print(f"Error fetching checklist: {e}. Proceeding without it.")
-# ---------------------------------------------------------------------
 
 # Fetch the PR Diff
 diff_headers = {
@@ -56,29 +54,30 @@ diff = requests.get(pr_metadata_url, headers=diff_headers).text
 if len(diff) > 50000:
     diff = diff[:50000] + "\n\n...[Diff truncated due to length]..."
 
-# --- UPDATED PROFESSIONAL PROMPT with DoD and Suggestions ---
+# --- UPDATED PROMPT: Requesting specific emoji/bold formatting ---
 prompt = f"""
 You are an expert, professional Android Developer and Senior Kotlin code reviewer. Analyze the following GitHub Pull Request diff and provide a highly accurate, objective, and constructive review formatted exactly with these headings. 
 
 ### 📝 Summary
 (Provide a concise 2-3 line objective summary of the PR's purpose and changes.)
 
-### 🔑 Key Changes
-(Provide bullet points of the most important technical changes.)
-
 ### ✅ Definition of Done Check (DoD)
-(Compare the changes in the diff against the provided Team Checklist. For each numbered point in the checklist, state objectively if the PR appears to adhere to it based on the diff. If no specific checklist content is provided below, state "General industry best practices applied.")
+(Critically compare the changes in the diff against the provided Team Checklist items below. Provide an objective grading for each point. **You must adhere strictly to the following formatting:**
+
+- If an item adheres to the checklist: Start the line with the ✅ emoji. (e.g., "✅ **Item 1:** Verified unit tests are included.")
+- **If an item is violated or missing:** Start the line with the ❌ emoji and ****. (e.g., "❌ **]** No KDoc comments found for new public functions.")
+
+If no specific checklist content is provided, state "General industry best practices applied.")
 
 [Team Checklist Context Start]
 {checklist_content if checklist_content else "No specific checklist provided."}
 [Team Checklist Context End]
 
 ### 🤖 Android & Kotlin Feedback & Suggestions
-(Critique the code objectively for Android-specific best practices, focusing on performance, Kotlin idiomatic usage, and memory management.
- If you identify inefficient code that can be improved, provide the critique and then **provide the actual corrected code block in Markdown format so the developer can copy-paste it directly**. Use specific file paths/line references from the diff where possible.)
+(Critique the code objectively for Android-specific best practices, focusing on performance, Kotlin idiomatic usage, and memory management. If you identify inefficient code that can be improved, provide the critique and then **provide the actual corrected code block in Markdown format so the developer can copy-paste it directly**.)
 
 ### ⚠️ Risks
-(Highlight potential risks such as unhandled exceptions, memory leaks, or main thread blocks. If none, state "No obvious risks detected.")
+(Highlight potential risks such as unhandled exceptions, memory leaks, or main thread blocks.)
 
 ### 🛑 Merge Verdict
 (Choose exactly ONE: 🟢 **LGTM (Looks Good To Merge)**, 🟡 **Needs Review (Revisions Recommended)**, or 🔴 **HARD STOP (Do not merge until addressed)**, and add a brief professional justification based on findings.)
@@ -86,6 +85,7 @@ You are an expert, professional Android Developer and Senior Kotlin code reviewe
 Here is the diff:
 {diff}
 """
+# ------------------------------------------------------------------
 
 # Call Gemini API
 gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_api_key}"
