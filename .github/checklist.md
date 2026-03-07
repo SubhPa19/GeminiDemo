@@ -15,6 +15,7 @@ Please review and confirm the following before requesting review.
 * [ ] No business logic inside Activities or Fragments
 * [ ] ViewModels are lifecycle-safe
 * [ ] Dependency injection used properly (Hilt/Dagger/Koin)
+* [ ] Strings externalized to resources
 
 ## Performance
 
@@ -30,17 +31,6 @@ Please review and confirm the following before requesting review.
 * [ ] Observers removed when required
 * [ ] Coroutines scoped correctly
 
-## UI / UX
-
-* [ ] UI tested on multiple screen sizes
-* [ ] Accessibility considered
-* [ ] Dark mode supported
-* [ ] Strings externalized to resources
-
-## Testing
-
-* [ ] Manual testing completed
-
 ## Build & CI
 
 * [ ] Project builds successfully
@@ -54,6 +44,7 @@ Please review and confirm the following before requesting review.
 
 * [ ] README or documentation updated if required
 * [ ] Complex logic documented with comments
+* [ ] for new fun proper comments and jaba doc are added, if existing fun is modified update as per change
 
 ## PR Quality
 
