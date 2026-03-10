@@ -124,8 +124,8 @@ except (Exception, json.JSONDecodeError) as e:
     print(f"Failed to parse hunter JSON: {e}")
     potential_issues = []
 
-# --- PASS 2: NEW "ULTRA-READABLE SURGICAL FIX" VERIFIER PROMPT ---
-# We use f""" here so we must escape any literal braces inside.
+# --- PASS 2: "CRISP, CONCISE, AND SURGICAL FIX" VERIFIER PROMPT ---
+# We must use f""" here so we must escape any literal braces inside.
 verifier_prompt = f"""
 You are the cynical and highly experienced Lead Android Developer at a large enterprise. You are reviewing a list of potential issues in a Git Diff found by a junior AI agent.
 
@@ -147,12 +147,12 @@ For the high-signal findings that you verify, keep them and format them construc
         //
         // Make suspend and use coroutine delay
         private suspend fun refreshSessionData() {{
-            // runBlocking {{ // REMOVE  <-- Double-escape fix applied here.
+            // runBlocking {{ // REMOVE
             //    Thread.sleep(1500) // REMOVE
                 delay(1500) // Use coroutine delay
-            // }}  <-- Double-escape fix applied here.
+            // }}
             println("Refreshing session data")
-        }} <-- Double-escape fix applied here.
+        }}
         ```
 
 * **]**: Immediate, specific, surgical, highly readable.
