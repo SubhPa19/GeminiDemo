@@ -154,7 +154,7 @@ Output your final verification report in this exact Markdown format. Do not use 
 ### 🤖 Verified Technical Feedback & Solutions
 (List only the high-severity, technical, and accurate issues you verified. Provide objective critique and Markdown code blocks showing the refactor solution.)
 
-### ⚠️风险 (Risks)
+### ⚠️ Risks
 (List severe technical risks, such as crashing potential or unhandled exceptions.)
 
 ### 🛑 Merge Verdict
