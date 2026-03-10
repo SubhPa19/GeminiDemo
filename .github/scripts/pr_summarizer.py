@@ -97,7 +97,7 @@ You are an expert Android Developer specializing in static code analysis and mem
 Analyze the following Git Diff and identify ANY and ALL potential violations, inefficient code patterns, security risks, memory leak hazards, or issues regarding null safety.
 
  Output your findings as a raw JSON array of objects, with each object containing:
-- **`filename`**: File Name .
+- **`path`**: File path.
 - **`line`**: The line number the issue applies to. Use the line number from the "new" side (the + lines).
 - **`finding`**: A concise technical description of the potential issue.
 
@@ -124,7 +124,7 @@ except (Exception, json.JSONDecodeError) as e:
     print(f"Failed to parse hunter JSON: {e}")
     potential_issues = []
 
-# --- PASS 2: NEW "CRISP AND CONCISE" VERIFIER PROMPT ---
+# --- PASS 2: NEW "ULTRA-READABLE SURGICAL FIX" VERIFIER PROMPT ---
 verifier_prompt = f"""
 You are the cynical and highly experienced Lead Android Developer at a large enterprise. You are reviewing a list of potential issues in a Git Diff found by a junior AI agent.
 
@@ -133,30 +133,54 @@ Your role is to act as a **Verifier and Filter**. Analyze each potential issue a
 For the high-signal findings that you verify, keep them and format them constructively as a final objective report.
 
 
-1.  **NO DUMPING WHOLE CLASSES OR LARGE FUNCTIONS.** When providing refactor solutions, output only the specific lines changed, showing a surgical fix. Do not include surrounding context if it is not necessary. Focus only on the line being roasted.
-2.  **BE CRISP & CONCISE.** Limit your technical critiques to **ONE OR TWO PUNCHY SENTENCES MAX**. Get to the point quickly.
-3.  **DO NOT Waffle or Explain basic concepts.** Assume the team knows Android.
+1.  **NO DUMPING IRRELEVANT CONTEXT or "Clumpy" Code Dumps.** Focus *only* on the surgically corrected line. Do not include surrounding function/class definitions if not necessary. Output *only* the specific corrected lines of code.
+2.  **FORBID COMMENTED-OUT CONTEXT.** Do not output code like `// REMOVE...` or `// var ... = null // REMOVE`. Just output the clean, final, corrected line(s) of code. If lines must be removed, state "Lines X-Y were removed" in the critique text.
+3.  **SEPARATE CRITIQUE AND SOLUTION.** Provide a 1-2 sentence concise critique first, then clearly introduce the "Surgical Fix."
+4.  **BE CRISP.** Assume the team knows Android.
+
+
+
+* **]**: Clumpy, clutters the PR, forces developer to read too much irrelevant commented context.
+    * **UserSessionManager.kt: 42]**:Direct main thread blocking guarantees ANR. Make suspend and use coroutine delay.
+        ```kotlin
+        //
+        // Make suspend and use coroutine delay
+        private suspend fun refreshSessionData() {
+            // runBlocking { // REMOVE
+            //    Thread.sleep(1500) // REMOVE
+                delay(1500) // Use coroutine delay
+            // }
+            println("Refreshing session data")
+        }
+        ```
+
+* **]**: Immediate, specific, surgical, highly readable.
+    * **UserSessionManager.kt: 42]**:Direct main thread blocking via `runBlocking` and `Thread.sleep` guarantees an Application Not Responding (ANR) error. Make suspend and use coroutine delay. **Surgical Fix:**
+        ```kotlin
+        // Verified surgical fix on line 42
+        delay(1500)
+        ```
 
 Output your final verification report in this exact Markdown format. Do not use JSON.
 
 ### ✅ Verification Verdict: DoD Check
-(List each Team Checklist item below. Provide an objective grading: ✅ **Adherence**, or ❌ **]** bold the failure.)
+(List each Team Checklist item. Grade: ✅ **Adherence**, or ❌ **]** bold the failure.)
 
 
 {checklist_content if checklist_content else "No specific checklist provided."}
 
 ### 🤖 Verified Technical Feedback & Solutions
 (List only high-severity, technical, and accurate issues you verified. Format as dynamic list.)
-* **]**:
+* **]**: [Concise Critique (max 2 sentences)].
     ```kotlin
    
     ```
 
-### ⚠️ (Risks)
+### ⚠️风险 (Risks)
 (List severe technical risks only.)
 
 ### 🛑 Merge Verdict
-(Choose exactly ONE: 🟢 **LGTM**, 🟡 **Needs Review**, 🔴 **HARD STOP**, and provide a 1-sentence profesional justification.)
+(Choose exactly ONE: 🟢 **LGTM**, 🟡 **Needs Review**, 🔴 **HARD STOP**, and provide a 1-sentence professional justification.)
 
 Here is the Git Diff:
 {diff}
@@ -168,7 +192,7 @@ And here are the potential issues reported by the Hunter Agent:
 
 # Call Gemini for the final verification report.
 try:
-    res_verified = requests.post(gemini_base_url, json={"contents": [{"parts": [{"text": verifier_prompt}]}]}).json()
+    res_verified = requests.post(gemini_base_url, json={"contents": [{"parts": [{"text": prompt}]}]}).json()
     final_verified_report_text = res_verified['candidates'][0]['content']['parts'][0]['text']
 except Exception as e:
     print(f"Failed to generate verification report: {e}")
@@ -176,11 +200,11 @@ except Exception as e:
 
 # 4. Final Stage: Build the full footer and update the main comment.
 footer_prefix = f"\n---\nHey {mentions_footer_base}"
-final_closing = f"{footer_prefix}, your automated PR Agent has completed a rigorous multi-pass verification to ensure high-signal, crisp findings. Your roast is ready."
+final_closing = f"{footer_prefix}, your automated PR Agent has completed a rigorous multi-pass verification to ensure high-signal, crisp, and surgical findings. Your roast is ready."
 
 final_summary_body = f"> **Summary:** {pr_summary_text}\n\n{final_verified_report_text}\n\n{final_closing}\n{bot_marker}\n*⏳ Reluctantly updated automatically by your automated Senior Dev.*"
 
 if existing_agent_comment_id:
     update_url = f"https://api.github.com/repos/{repo}/issues/comments/{existing_agent_comment_id}"
     requests.patch(update_url, headers=api_headers, json={"body": final_summary_body})
-    print("Main summary comment updated with crisp verified roast.")
+    print("Main summary comment updated with surgical verified roast.")
