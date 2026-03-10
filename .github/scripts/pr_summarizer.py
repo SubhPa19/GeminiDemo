@@ -177,7 +177,7 @@ Output your final verification report in this exact Markdown format. Do not use 
    
     ```
 
-### ⚠️风险 (Risks)
+### ⚠️(Risks)
 (List severe technical risks only.)
 
 ### 🛑 Merge Verdict
