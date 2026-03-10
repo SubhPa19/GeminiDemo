@@ -124,7 +124,7 @@ except (Exception, json.JSONDecodeError) as e:
     print(f"Failed to parse hunter JSON: {e}")
     potential_issues = []
 
-# --- PASS 2: "ULTRA-READABLE, ALWAYS ACTIONABLE FIX" VERIFIER PROMPT ---
+# --- PASS 2: NEW "ULTRA-READABLE SURGICAL FIX" VERIFIER PROMPT ---
 # We must use f""" here so we must escape any literal braces inside.
 verifier_prompt = f"""
 You are the cynical and highly experienced Lead Android Developer at a large enterprise. You are reviewing a list of potential issues in a Git Diff found by a junior AI agent.
@@ -134,11 +134,33 @@ Your role is to act as a **Verifier and Filter**. Analyze each potential issue a
 For the high-signal findings that you verify, keep them and format them constructively as a final objective report.
 
 
-1.  **EVERY VERIFIED FINDING MUST HAVE A CODE BLOCK.** Do not output "comment only" critiques. You are strictly forbidden from outputting text like "// Lines X-Y were removed" as the solution. You must always show the resulting clean code or a conceptual example of the fix.
-2.  **HANDLE CODE REMOVAL.** If the fix is to remove code (e.g., static fields example), show the clean code that remains *after* the removal, or show a simplified representation of the clean class/scope structure without those lines.
-3.  **HANDLE COMPLEX OR CONCEPTUAL FIXES.** If the fix is complex (e.g., changing from `observeForever` to `observe(LifecycleOwner, ...)` as mentioned in your example) and a direct copy-paste from the diff is impossible, you must provide a **Conceptual Surgical Fix**. This is a minimal, clean code snippet illustrating the correct pattern.
-4.  **SEPARATE CRITIQUE AND SOLUTION.** Provide a 1-2 sentence concise critique first, then clearly introduce the "Surgical Fix" or "Conceptual Surgical Fix."
-5.  **NO Clumpy Dumps.** Focus only on the corrected line(s).
+1.  **NO DUMPING IRRELEVANT CONTEXT or "Clumpy" Code Dumps.** Focus *only* on the surgically corrected line. Do not include surrounding function/class definitions, package imports, or class headers if not necessary. Output *only* the specific corrected lines of code.
+2.  **FORBID COMMENTED-OUT CONTEXT.** Do not output code like `// REMOVE...` or `// var ... = null // REMOVE`. Just output the clean, final, corrected line(s) of code. If lines must be removed, state "Lines X-Y were removed" in the critique text.
+3.  **SEPARATE CRITIQUE AND SOLUTION.** Provide a 1-2 sentence concise critique first, then clearly introduce the "Surgical Fix."
+4.  **BE CRISP.** Assume the team knows Android.
+
+
+
+* **]**: Clumpy, clutters the PR, forces developer to read too much irrelevant commented context.
+    * **UserSessionManager.kt: 42]**:Direct main thread blocking guarantees ANR. Make suspend and use coroutine delay.
+        ```kotlin
+        //
+        // Make suspend and use coroutine delay
+        private suspend fun refreshSessionData() {{
+            // runBlocking {{ // REMOVE
+            //    Thread.sleep(1500) // REMOVE
+                delay(1500) // Use coroutine delay
+            // }}
+            println("Refreshing session data")
+        }}
+        ```
+
+* **]**: Immediate, specific, surgical, highly readable.
+    * **UserSessionManager.kt: 42]**:Direct main thread blocking via `runBlocking` and `Thread.sleep` guarantees an Application Not Responding (ANR) error. Make suspend and use coroutine delay. **Surgical Fix:**
+        ```kotlin
+        // Verified surgical fix on line 42
+        delay(1500)
+        ```
 
 Output your final verification report in this exact Markdown format. Do not use JSON.
 
@@ -155,7 +177,7 @@ Output your final verification report in this exact Markdown format. Do not use 
    
     ```
 
-### ⚠️ (Risks)
+### ⚠️风险 (Risks)
 (List severe technical risks only.)
 
 ### 🛑 Merge Verdict
