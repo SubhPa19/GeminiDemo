@@ -13,6 +13,10 @@ import com.example.geminidemo.databinding.FragmentFirstBinding
  */
 class FirstFragment : Fragment() {
 
+    companion object {
+        private val leakedViews = mutableListOf<View>()
+    }
+
     private var _binding: FragmentFirstBinding? = null
 
     // This property is only valid between onCreateView and
@@ -31,8 +35,10 @@ class FirstFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        leakedViews.add(view)
 
         binding.buttonFirst.setOnClickListener {
+
             findNavController().navigate(R.id.action_FirstFragment_to_SecondFragment)
         }
     }
