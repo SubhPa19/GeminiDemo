@@ -97,7 +97,7 @@ You are an expert Android Developer specializing in static code analysis and mem
 Analyze the following Git Diff and identify ANY and ALL potential violations, inefficient code patterns, security risks, memory leak hazards, or issues regarding null safety.
 
  Output your findings as a raw JSON array of objects, with each object containing:
-- **`path`**: File path.
+- **`filename`**: File Name .
 - **`line`**: The line number the issue applies to. Use the line number from the "new" side (the + lines).
 - **`finding`**: A concise technical description of the potential issue.
 
