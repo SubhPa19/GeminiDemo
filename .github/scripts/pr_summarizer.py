@@ -8,7 +8,7 @@ import re
 repo = os.getenv("REPO")
 pr_number = os.getenv("PR_NUMBER")
 github_token = os.getenv("GITHUB_TOKEN")
-gemini_api_key = os.getenv("GEMINI_API_KEY")
+gemini_api_key = os.getenv("ANOTHER_API_KEY")
 checklist_path = os.getenv("CHECKLIST_PATH", ".github/checklist.md") 
 
 if not all([repo, pr_number, github_token, gemini_api_key]):
