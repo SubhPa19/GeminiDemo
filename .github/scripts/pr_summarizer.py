@@ -58,7 +58,7 @@ gemini_base_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemi
 
 # 1. Get quick context summary based only on title
 pr_title = pr_meta.get("title", "this PR")
-quick_summary_prompt = f"""Summarize in one short sentence what this Pull Request, titled '{pr_title}', is attempting to achieve based on its description."""
+quick_summary_prompt = f"""Summarize in one short sentence what this Pull Request, titled '{pr_title}', is attempting to achieve based on its description. if description is not provided summary should be based on git diff"""
 pr_summary_text = pr_title 
 try:
     res_quick_summary = requests.post(gemini_base_url, json={"contents": [{"parts": [{"text": quick_summary_prompt}]}]}).json()
