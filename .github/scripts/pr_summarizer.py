@@ -139,12 +139,16 @@ You are the Lead Android Developer. Verify findings and generate a dual JSON rep
 2. "verified_findings": JSON logic array [{{"path": "path", "line": 123, "critique": "text", "surgical_fix": "code"}}]
 3. "merge_verdict": 🟢 LGTM, 🟡 Needs Review, or 🔴 HARD STOP.
 
-### DoD Requirements:
-{checklist}
+### ✅ Verification Verdict: DoD Check (Sorted: Passed first, then Failed)
+| Requirement | Status | Reasoning/Note |
+| :--- | :--- | :--- |
+| [Checklist Item] | ✅ / ❌ / 🟠 | [Short reasoning] |
 
-### Style for "markdown_report":
-Use 🔴 **CRITICAL**, 🟡 **WARNING**, 🔵 **OPTIMIZATION** for findings.
-Include the Merge Verdict at the bottom.
+**IMPORTANT**: In the table above, YOU MUST SORT THE ROWS: list all **Passed (✅)** items first, followed by all **Failed (❌ or 🔴)** items.
+
+### 🤖 Verified Technical Feedback & Solutions
+(Order by severity: 🔴 **CRITICAL**, 🟡 **WARNING**, 🔵 **OPTIMIZATION**)
+* **[File:Line]**: [Critique - max 2 sentences]. **Surgical Fix:**
 
 Diff: {diff}
 Findings: {json.dumps(potential_issues, indent=2)}
