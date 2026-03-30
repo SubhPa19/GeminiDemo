@@ -4,22 +4,19 @@ import requests
 import sys
 import time
 import re
-from concurrent.futures import ThreadPoolExecutor
 
 class PRSummarizer:
     def __init__(self):
         self.repo = os.getenv("REPO")
         self.pr_number = os.getenv("PR_NUMBER")
         self.github_token = os.getenv("GITHUB_TOKEN")
-        # Support both legacy and new API key env vars
         self.gemini_api_key = os.getenv("ANOTHER_API_KEY") or os.getenv("GEMINI_API_KEY")
         self.checklist_path = os.getenv("CHECKLIST_PATH", ".github/checklist.md")
-        # Support configurable model name
         self.model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-        self.bot_marker = "" # Hidden marker for finding existing comments
+        self.bot_marker = "<!-- gemini-bot-review -->" 
         
         if not all([self.repo, self.pr_number, self.github_token, self.gemini_api_key]):
-            print("❌ Missing required environment variables (REPO, PR_NUMBER, GITHUB_TOKEN, and ANOTHER_API_KEY or GEMINI_API_KEY).")
+            print("❌ Missing required environment variables (REPO, PR_NUMBER, GITHUB_TOKEN, etc.).")
             sys.exit(1)
 
         self.api_headers = {
@@ -30,19 +27,23 @@ class PRSummarizer:
         self.gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model_name}:generateContent?key={self.gemini_api_key}"
 
     def _safe_request(self, method, url, **kwargs):
-        """Generic request wrapper with basic retry logic."""
-        for attempt in range(3):
+        """Generic request wrapper with robust 429 (Rate Limit) handling."""
+        for attempt in range(5):
             try:
                 res = requests.request(method, url, **kwargs)
+                if res.status_code == 429:
+                    print(f"🛑 Rate limit hit (429). Attempt {attempt+1}. Waiting 25 seconds...")
+                    time.sleep(25)
+                    continue
                 res.raise_for_status()
                 return res
             except Exception as e:
                 print(f"⚠️ Attempt {attempt+1} failed for {url}: {e}")
-                time.sleep(2 ** attempt)
+                time.sleep(2 ** attempt + 2) # Adding jitter
         return None
 
     def fetch_pr_data(self):
-        print("Fetching PR metadata...")
+        print("🔍 Fetching PR metadata...")
         url = f"{self.base_url}/pulls/{self.pr_number}"
         res = self._safe_request("GET", url, headers=self.api_headers)
         if not res: return None
@@ -59,7 +60,7 @@ class PRSummarizer:
         }
 
     def fetch_diff(self, url):
-        print("Fetching PR diff...")
+        print("💾 Fetching PR diff...")
         headers = self.api_headers.copy()
         headers["Accept"] = "application/vnd.github.v3.diff"
         res = self._safe_request("GET", url, headers=headers)
@@ -76,7 +77,6 @@ class PRSummarizer:
         res = self._safe_request("GET", url, headers={"Authorization": f"Bearer {self.github_token}", "Accept": "application/vnd.github.v3.raw"})
         if res and res.status_code == 200:
             return res.text
-        print(f"Checklist not found at {self.checklist_path}. Using general best practices.")
         return "General industry best practices applied."
 
     def get_gemini_completion(self, prompt, is_json=False):
@@ -92,31 +92,16 @@ class PRSummarizer:
         except (KeyError, IndexError):
             return None
 
-    def post_inline_comment(self, path, line, body, head_sha):
-        print(f"Posting inline comment to {path}:{line}...")
-        url = f"{self.base_url}/pulls/{self.pr_number}/comments"
+    def submit_bundled_review(self, body, event, comments):
+        """Submits all findings in a single Bundled Review to minimize noise."""
+        print(f"📦 Submitting bundled review ({len(comments)} inline findings)...")
+        url = f"{self.base_url}/pulls/{self.pr_number}/reviews"
         payload = {
-            "body": body,
-            "commit_id": head_sha,
-            "path": path,
-            "line": int(line),
-            "side": "RIGHT"
+            "body": body + f"\n\n{self.bot_marker}",
+            "event": event,
+            "comments": comments
         }
         return self._safe_request("POST", url, headers=self.api_headers, json=payload)
-
-    def get_existing_comment_id(self):
-        url = f"{self.base_url}/issues/{self.pr_number}/comments"
-        res = self._safe_request("GET", url, headers=self.api_headers)
-        if res:
-            for comment in res.json():
-                if self.bot_marker in comment.get("body", ""):
-                    return comment["id"]
-        return None
-
-    def update_comment(self, comment_id, body):
-        url = f"{self.base_url}/issues/comments/{comment_id}" if comment_id else f"{self.base_url}/issues/{self.pr_number}/comments"
-        method = "PATCH" if comment_id else "POST"
-        return self._safe_request(method, url, headers=self.api_headers, json={"body": body})
 
     def run(self):
         # 1. Fetch Metadata and Diff
@@ -125,104 +110,72 @@ class PRSummarizer:
         
         diff = self.fetch_diff(meta['diff_url'])
         checklist = self.fetch_checklist(meta['base_branch'])
-        
-        # 2. Concurrency: Run Summary and Hunter passes in parallel
-        print("🚀 Starting parallel analysis passes...")
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            summary_prompt = f"Summarize in one short sentence what this Pull Request, titled '{meta['title']}', is attempting to achieve based on its description. If description is not provided summary should be based on git diff. Title: {meta['title']}, Description: {meta['description']}"
-            summary_future = executor.submit(self.get_gemini_completion, summary_prompt)
-            
-            hunter_prompt = f"Analyze the following Git Diff for Android bugs/leaks. Output a JSON array of objects with 'path', 'line', and 'finding'.\n\n{diff}"
-            hunter_future = executor.submit(self.get_gemini_completion, hunter_prompt, is_json=True)
 
-        pr_summary = summary_future.result() or meta['title']
-        raw_issues = hunter_future.result() or "[]"
+        # 2. Sequential Analysis passes (Rate limit prevention)
+        print("🚀 Starting sequential analysis passes...")
         
+        summary_prompt = f"Summarize in one short sentence what this PR titled '{meta['title']}' is attempting to achieve. Title: {meta['title']}, Description: {meta['description']}"
+        pr_summary = self.get_gemini_completion(summary_prompt) or meta['title']
+        
+        time.sleep(2) # Safety delay
+        
+        hunter_prompt = f"Analyze this Git Diff for Android bugs/leaks. Output a JSON array of objects with 'path', 'line', and 'finding'.\n\n{diff}"
+        raw_issues = self.get_gemini_completion(hunter_prompt, is_json=True) or "[]"
         try:
             potential_issues = json.loads(raw_issues)
         except:
             potential_issues = []
 
-        # 3. Post "Processing" comment
-        mentions = f"Hey @{meta['author']}" + (f" and CC Reviewers: " + " ".join([f"@{r}" for r in meta['reviewers']]) if meta['reviewers'] else "")
-        initial_body = f"> **Summary:** {pr_summary}\n\n{mentions}, our agent is initiating a multi-pass technical analysis of your PR changes. Please wait.\n\n{self.bot_marker}\n*⏳ Analysis in progress.*"
+        time.sleep(2) # Safety delay
         
-        comment_id = self.get_existing_comment_id()
-        self.update_comment(comment_id, initial_body)
-        
-        if not comment_id:
-            time.sleep(1)
-            comment_id = self.get_existing_comment_id()
-
-        # 4. PASS 2: Verifier Pass (Serial, depends on Hunter output)
+        # 3. VERIFIER PASS: Hybrid JSON return for Summary + Inline
         print("🛡️ Starting verification pass...")
         verifier_prompt = f"""
-You are the cynical and highly experienced Lead Android Developer at a large enterprise. You are reviewing a list of potential issues in a Git Diff found by a junior AI agent.
+You are the Lead Android Developer. Verify findings and generate a dual JSON report.
 
-**Objective**: Verify findings, provide surgical fixes, AND generate a professional Markdown report.
-
-**REQUIRED OUTPUT FORMAT**: You must return a **JSON object** with these exact keys:
-1. "markdown_report": A string containing the full Markdown report for the PR header.
-2. "verified_findings": A JSON array of objects for inline comments: [{{"path": "file_path", "line": 123, "critique": "short text", "surgical_fix": "clean code"}}]
+**REQUIRED OUTPUT JSON KEYS**:
+1. "markdown_report": Full Markdown report text (DoD table, Severity-coded bugs, Risks).
+2. "verified_findings": JSON logic array [{{"path": "path", "line": 123, "critique": "text", "surgical_fix": "code"}}]
 3. "merge_verdict": 🟢 LGTM, 🟡 Needs Review, or 🔴 HARD STOP.
 
-### 📜 Instructions for "markdown_report":
-Follow this exact structure:
-
-### ✅ Verification Verdict: DoD Check
-| Requirement | Status | Reasoning/Note |
-| :--- | :--- | :--- |
-| [Checklist Item] | ✅ / ❌ | [Short note if failed] |
-
+### DoD Requirements:
 {checklist}
 
-### 🤖 Verified Technical Feedback & Solutions
-(Order by severity: 🔴 **CRITICAL**, 🟡 **WARNING**, 🔵 **OPTIMIZATION**)
-* **[File:Line]**: [Critique - max 2 sentences]. **Surgical Fix:**
-    ```kotlin
-    [Clean, final code only]
-    ```
+### Style for "markdown_report":
+Use 🔴 **CRITICAL**, 🟡 **WARNING**, 🔵 **OPTIMIZATION** for findings.
+Include the Merge Verdict at the bottom.
 
-### ⚠️ Technical Risks
-(Highlight crashes, memory leaks, or security vulnerabilities only.)
-
-### 🛑 Merge Verdict
-(Exactly ONE: 🟢 **LGTM**, 🟡 **Needs Review**, 🔴 **HARD STOP**)
-[1-sentence professional justification].
-
----
-**PR Context**: 
-Title: {meta['title']}
-Description: {meta['description']}
-
-**Git Diff**:
-{diff}
-
-**Junior Agent Findings**:
-{json.dumps(potential_issues, indent=2)}
+Diff: {diff}
+Findings: {json.dumps(potential_issues, indent=2)}
 """
         raw_verified_res = self.get_gemini_completion(verifier_prompt, is_json=True)
         try:
-            verified_data = json.loads(raw_verified_res)
+            v_data = json.loads(raw_verified_res)
         except:
-            verified_data = {"markdown_report": "⚠️ Analysis failed to parse. Please check PR manually.", "merge_verdict": "🟡 Needs Review", "verified_findings": []}
+            v_data = {"markdown_report": "⚠️ Analysis error.", "merge_verdict": "🟡 Needs Review", "verified_findings": []}
 
-        # 5. Post Inline Comments
-        print(f"📍 Posting {len(verified_data.get('verified_findings', []))} inline comments...")
-        for finding in verified_data.get('verified_findings', []):
-            body = f"**Critique**: {finding.get('critique')}\n\n**Surgical Fix**:\n```kotlin\n{finding.get('surgical_fix')}\n```"
-            self.post_inline_comment(finding.get('path'), finding.get('line'), body, meta['head_sha'])
+        # 4. Map Verdict to GitHub event
+        verdict = v_data.get('merge_verdict', '🟡 Needs Review')
+        github_event = "COMMENT"
+        if "🔴" in verdict: github_event = "REQUEST_CHANGES"
+        elif "🟢" in verdict and not v_data.get('verified_findings'): github_event = "APPROVE"
 
-        # 6. Final Update to Header Comment
-        final_body = (
-            f"> **Summary:** {pr_summary}\n\n"
-            f"{verified_data.get('markdown_report')}\n\n"
-            f"---\n{mentions}, your automated PR Agent has also posted surgical findings directly to your file diffs.\n"
-            f"{self.bot_marker}\n"
-            f"*⏳ Reluctantly updated automatically.*"
-        )
-        self.update_comment(comment_id, final_body)
-        print("✅ Analysis complete.")
+        # 5. Prepare bundled comments
+        bundled_comments = []
+        for f in v_data.get('verified_findings', []):
+            body = f"**Critique**: {f.get('critique')}\n\n**Surgical Fix**:\n```kotlin\n{f.get('surgical_fix')}\n```"
+            bundled_comments.append({
+                "path": f.get('path'),
+                "line": int(f.get('line')),
+                "body": body
+            })
+
+        # 6. Submit ONE single review
+        mentions = f"Hey @{meta['author']}"
+        header = f"> **Summary:** {pr_summary}\n\n"
+        self.submit_bundled_review(header + v_data.get('markdown_report'), github_event, bundled_comments)
+        
+        print("✅ Review submitted successfully. Exactly ONE notification sent.")
 
 if __name__ == "__main__":
     PRSummarizer().run()
