@@ -4,6 +4,7 @@ import requests
 import sys
 import time
 import re
+from concurrent.futures import ThreadPoolExecutor
 
 class PRSummarizer:
     def __init__(self):
@@ -27,19 +28,19 @@ class PRSummarizer:
         self.gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model_name}:generateContent?key={self.gemini_api_key}"
 
     def _safe_request(self, method, url, **kwargs):
-        """Generic request wrapper with robust 429 (Rate Limit) handling."""
+        """Generic request wrapper with optimized 429 (Rate Limit) handling."""
         for attempt in range(5):
             try:
                 res = requests.request(method, url, **kwargs)
                 if res.status_code == 429:
-                    print(f"🛑 Rate limit hit (429). Attempt {attempt+1}. Waiting 25 seconds...")
-                    time.sleep(25)
+                    print(f"🛑 Rate limit hit (429). Attempt {attempt+1}. Waiting 10 seconds...")
+                    time.sleep(10)
                     continue
                 res.raise_for_status()
                 return res
             except Exception as e:
                 print(f"⚠️ Attempt {attempt+1} failed for {url}: {e}")
-                time.sleep(2 ** attempt + 2) # Adding jitter
+                time.sleep(2 ** attempt + 1)
         return None
 
     def fetch_pr_data(self):
@@ -111,23 +112,23 @@ class PRSummarizer:
         diff = self.fetch_diff(meta['diff_url'])
         checklist = self.fetch_checklist(meta['base_branch'])
 
-        # 2. Sequential Analysis passes (Rate limit prevention)
-        print("🚀 Starting sequential analysis passes...")
+        # 2. Concurrency: Run Summary and Hunter passes in parallel
+        print("🚀 Starting optimized analysis passes...")
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            summary_prompt = f"Summarize in one short sentence what this PR titled '{meta['title']}' is attempting to achieve. Title: {meta['title']}, Description: {meta['description']}"
+            summary_future = executor.submit(self.get_gemini_completion, summary_prompt)
+            
+            hunter_prompt = f"Analyze this Git Diff for Android bugs/leaks. Output a JSON array of objects with 'path', 'line', and 'finding'.\n\n{diff}"
+            hunter_future = executor.submit(self.get_gemini_completion, hunter_prompt, is_json=True)
+
+            pr_summary = summary_future.result() or meta['title']
+            raw_issues = hunter_future.result() or "[]"
         
-        summary_prompt = f"Summarize in one short sentence what this PR titled '{meta['title']}' is attempting to achieve. Title: {meta['title']}, Description: {meta['description']}"
-        pr_summary = self.get_gemini_completion(summary_prompt) or meta['title']
-        
-        time.sleep(2) # Safety delay
-        
-        hunter_prompt = f"Analyze this Git Diff for Android bugs/leaks. Output a JSON array of objects with 'path', 'line', and 'finding'.\n\n{diff}"
-        raw_issues = self.get_gemini_completion(hunter_prompt, is_json=True) or "[]"
         try:
             potential_issues = json.loads(raw_issues)
         except:
             potential_issues = []
 
-        time.sleep(2) # Safety delay
-        
         # 3. VERIFIER PASS: Hybrid JSON return for Summary + Inline
         print("🛡️ Starting verification pass...")
         verifier_prompt = f"""
@@ -171,7 +172,6 @@ Findings: {json.dumps(potential_issues, indent=2)}
             })
 
         # 6. Submit ONE single review
-        mentions = f"Hey @{meta['author']}"
         header = f"> **Summary:** {pr_summary}\n\n"
         self.submit_bundled_review(header + v_data.get('markdown_report'), github_event, bundled_comments)
         
