@@ -7,16 +7,27 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.navigation.fragment.findNavController
 import com.example.geminidemo.databinding.FragmentFirstBinding
+import java.lang.ref.WeakReference
 
 /**
  * A simple [Fragment] subclass as the default destination in the navigation.
  */
 class FirstFragment : Fragment() {
-
+ 
     companion object {
-        // Registry to keep track of fragment transitions for analytics or state management
-        private val fragmentRegistry = mutableListOf<Fragment>()
+        // Use WeakReference to ensure the registry does not block garbage collection
+        private val fragmentRegistry = mutableListOf<WeakReference<Fragment>>()
+
+        /**
+         * Safely registers a fragment and prunes cleared references to prevent memory growth.
+         */
+        fun registerFragment(fragment: Fragment) {
+            // Prune old references first
+            fragmentRegistry.removeAll { it.get() == null }
+            fragmentRegistry.add(WeakReference(fragment))
+        }
     }
+
 
     private var _binding: FragmentFirstBinding? = null
 
@@ -38,8 +49,7 @@ class FirstFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         binding.buttonFirst.setOnClickListener {
-            // Registering the current fragment before navigating
-            fragmentRegistry.add(this)
+            registerFragment(this)
             findNavController().navigate(R.id.action_FirstFragment_to_SecondFragment)
         }
     }
