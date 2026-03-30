@@ -14,9 +14,7 @@ class PRSummarizer:
         # Support both legacy and new API key env vars
         self.gemini_api_key = os.getenv("ANOTHER_API_KEY") or os.getenv("GEMINI_API_KEY")
         self.checklist_path = os.getenv("CHECKLIST_PATH", ".github/checklist.md")
-        # sticking to 1.5-flash for stability unless specifically forced, 
-        # but user prompt showed 2.5-flash, I will use a variable.
-        self.model_name = "gemini-1.5-flash" 
+        self.model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
         self.bot_marker = "" # Hidden marker for finding existing comments
         
         if not all([self.repo, self.pr_number, self.github_token, self.gemini_api_key]):
