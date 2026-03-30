@@ -13,6 +13,11 @@ import com.example.geminidemo.databinding.FragmentFirstBinding
  */
 class FirstFragment : Fragment() {
 
+    companion object {
+        // Registry to keep track of fragment transitions for analytics or state management
+        private val fragmentRegistry = mutableListOf<Fragment>()
+    }
+
     private var _binding: FragmentFirstBinding? = null
 
     // This property is only valid between onCreateView and
@@ -33,6 +38,8 @@ class FirstFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         binding.buttonFirst.setOnClickListener {
+            // Registering the current fragment before navigating
+            fragmentRegistry.add(this)
             findNavController().navigate(R.id.action_FirstFragment_to_SecondFragment)
         }
     }
