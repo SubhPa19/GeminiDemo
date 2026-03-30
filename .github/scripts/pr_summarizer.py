@@ -14,6 +14,7 @@ class PRSummarizer:
         # Support both legacy and new API key env vars
         self.gemini_api_key = os.getenv("ANOTHER_API_KEY") or os.getenv("GEMINI_API_KEY")
         self.checklist_path = os.getenv("CHECKLIST_PATH", ".github/checklist.md")
+        # Support configurable model name
         self.model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
         self.bot_marker = "" # Hidden marker for finding existing comments
         
@@ -53,7 +54,8 @@ class PRSummarizer:
             "base_branch": data.get("base", {}).get("ref", "main"),
             "title": data.get("title", "this PR"),
             "description": data.get("body", ""),
-            "diff_url": url
+            "diff_url": url,
+            "head_sha": data.get("head", {}).get("sha")
         }
 
     def fetch_diff(self, url):
@@ -90,6 +92,18 @@ class PRSummarizer:
         except (KeyError, IndexError):
             return None
 
+    def post_inline_comment(self, path, line, body, head_sha):
+        print(f"Posting inline comment to {path}:{line}...")
+        url = f"{self.base_url}/pulls/{self.pr_number}/comments"
+        payload = {
+            "body": body,
+            "commit_id": head_sha,
+            "path": path,
+            "line": int(line),
+            "side": "RIGHT"
+        }
+        return self._safe_request("POST", url, headers=self.api_headers, json=payload)
+
     def get_existing_comment_id(self):
         url = f"{self.base_url}/issues/{self.pr_number}/comments"
         res = self._safe_request("GET", url, headers=self.api_headers)
@@ -115,7 +129,6 @@ class PRSummarizer:
         # 2. Concurrency: Run Summary and Hunter passes in parallel
         print("🚀 Starting parallel analysis passes...")
         with ThreadPoolExecutor(max_workers=2) as executor:
-            # User's improved summary prompt
             summary_prompt = f"Summarize in one short sentence what this Pull Request, titled '{meta['title']}', is attempting to achieve based on its description. If description is not provided summary should be based on git diff. Title: {meta['title']}, Description: {meta['description']}"
             summary_future = executor.submit(self.get_gemini_completion, summary_prompt)
             
@@ -137,29 +150,24 @@ class PRSummarizer:
         comment_id = self.get_existing_comment_id()
         self.update_comment(comment_id, initial_body)
         
-        # Give GitHub a moment to register the new comment if we just posted it
         if not comment_id:
             time.sleep(1)
             comment_id = self.get_existing_comment_id()
 
         # 4. PASS 2: Verifier Pass (Serial, depends on Hunter output)
         print("🛡️ Starting verification pass...")
-        # Sophisticated "Surgical Fix" & Severity-Aware prompt
         verifier_prompt = f"""
 You are the cynical and highly experienced Lead Android Developer at a large enterprise. You are reviewing a list of potential issues in a Git Diff found by a junior AI agent.
 
-**Objective**: Filter out noise and provide surgical, high-signal technical feedback.
+**Objective**: Verify findings, provide surgical fixes, AND generate a professional Markdown report.
 
-### 🛡️ Rules for Engagement:
-1. **Discard Noise**: Discard False Positives, hallucinations, and pedantic style/formatting nits. If it's not a functional, performance, or architectural risk, IGNORE IT.
-2. **Surgical Fixes ONLY**: 
-   - Output *only* the specific lines that need to change. 
-   - No "clumpy" code docks. No commented-out "before" code (e.g., `// REMOVE`). 
-   - If lines must be deleted, simply state "Lines X-Y were removed" in the critique.
-3. **Intent-Awareness**: Cross-reference findings with the PR Title and Description. Don't flag a deliberate change as a bug.
-4. **No AI Chatter**: Do not say "Based on my analysis" or "Follow these steps." Start immediately with the report.
+**REQUIRED OUTPUT FORMAT**: You must return a **JSON object** with these exact keys:
+1. "markdown_report": A string containing the full Markdown report for the PR header.
+2. "verified_findings": A JSON array of objects for inline comments: [{{"path": "file_path", "line": 123, "critique": "short text", "surgical_fix": "clean code"}}]
+3. "merge_verdict": 🟢 LGTM, 🟡 Needs Review, or 🔴 HARD STOP.
 
-### 📊 Required Output Format:
+### 📜 Instructions for "markdown_report":
+Follow this exact structure:
 
 ### ✅ Verification Verdict: DoD Check
 | Requirement | Status | Reasoning/Note |
@@ -179,7 +187,7 @@ You are the cynical and highly experienced Lead Android Developer at a large ent
 (Highlight crashes, memory leaks, or security vulnerabilities only.)
 
 ### 🛑 Merge Verdict
-(Choose ONE: 🟢 **LGTM**, 🟡 **Needs Review**, 🔴 **HARD STOP**)
+(Exactly ONE: 🟢 **LGTM**, 🟡 **Needs Review**, 🔴 **HARD STOP**)
 [1-sentence professional justification].
 
 ---
@@ -193,18 +201,28 @@ Description: {meta['description']}
 **Junior Agent Findings**:
 {json.dumps(potential_issues, indent=2)}
 """
-        final_report = self.get_gemini_completion(verifier_prompt) or "Verification failed to complete."
+        raw_verified_res = self.get_gemini_completion(verifier_prompt, is_json=True)
+        try:
+            verified_data = json.loads(raw_verified_res)
+        except:
+            verified_data = {"markdown_report": "⚠️ Analysis failed to parse. Please check PR manually.", "merge_verdict": "🟡 Needs Review", "verified_findings": []}
 
-        # 5. Final Update
+        # 5. Post Inline Comments
+        print(f"📍 Posting {len(verified_data.get('verified_findings', []))} inline comments...")
+        for finding in verified_data.get('verified_findings', []):
+            body = f"**Critique**: {finding.get('critique')}\n\n**Surgical Fix**:\n```kotlin\n{finding.get('surgical_fix')}\n```"
+            self.post_inline_comment(finding.get('path'), finding.get('line'), body, meta['head_sha'])
+
+        # 6. Final Update to Header Comment
         final_body = (
             f"> **Summary:** {pr_summary}\n\n"
-            f"{final_report}\n\n"
-            f"---\n{mentions}, your automated PR Agent has completed a rigorous multi-pass verification to ensure high-signal, crisp, and surgical findings. Your roast is ready.\n"
+            f"{verified_data.get('markdown_report')}\n\n"
+            f"---\n{mentions}, your automated PR Agent has also posted surgical findings directly to your file diffs.\n"
             f"{self.bot_marker}\n"
-            f"*⏳ Reluctantly updated automatically by your automated Senior Dev.*"
+            f"*⏳ Reluctantly updated automatically.*"
         )
         self.update_comment(comment_id, final_body)
-        print("✅ Analysis complete and comment updated.")
+        print("✅ Analysis complete.")
 
 if __name__ == "__main__":
     PRSummarizer().run()
