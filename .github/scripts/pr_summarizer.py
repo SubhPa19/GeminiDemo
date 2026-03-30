@@ -135,7 +135,7 @@ class PRSummarizer:
 You are the Lead Android Developer. Verify findings and generate a dual JSON report.
 
 **REQUIRED OUTPUT JSON KEYS**:
-1. "markdown_report": Full Markdown report text (DoD table, Severity-coded bugs, Risks).
+1. "markdown_report": Full Markdown report text (DoD table, Severity-coded bugs, Risks, Tests, Verdict).
 2. "verified_findings": JSON logic array [{{"path": "path", "line": 123, "critique": "text", "surgical_fix": "code"}}]
 3. "merge_verdict": 🟢 LGTM, 🟡 Needs Review, or 🔴 HARD STOP.
 
@@ -149,6 +149,21 @@ You are the Lead Android Developer. Verify findings and generate a dual JSON rep
 ### 🤖 Verified Technical Feedback & Solutions
 (Order by severity: 🔴 **CRITICAL**, 🟡 **WARNING**, 🔵 **OPTIMIZATION**)
 * **[File:Line]**: [Critique - max 2 sentences]. **Surgical Fix:**
+    ```kotlin
+    [Clean, final code]
+    ```
+
+### ⚠️ Technical Risks
+(Highlight potential crashes, leaks, or security vulnerabilities only.)
+
+### 🧪 Suggested Test Cases
+(Short list of specific scenarios to verify these changes.)
+
+### 🛑 Merge Verdict
+(Exactly ONE: 🟢 **LGTM**, 🟡 **Needs Review**, 🔴 **HARD STOP**)
+[1-sentence professional justification].
+
+---
 
 Diff: {diff}
 Findings: {json.dumps(potential_issues, indent=2)}
