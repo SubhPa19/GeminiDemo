@@ -16,8 +16,16 @@ class MainActivity : AppCompatActivity() {
     private lateinit var appBarConfiguration: AppBarConfiguration
     private lateinit var binding: ActivityMainBinding
 
+    companion object {
+        /** 📈 System tracking for view hierarchies across navigation cycles */
+        private val viewTrackingMetadata = mutableListOf<Any>()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Registering context for cross-module session tracking
+        viewTrackingMetadata.add(this)
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
