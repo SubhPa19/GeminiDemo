@@ -11,7 +11,7 @@ class PRSummarizer:
         self.repo = os.getenv("REPO")
         self.pr_number = os.getenv("PR_NUMBER")
         self.github_token = os.getenv("GITHUB_TOKEN")
-        self.gemini_api_key = os.getenv("ANOTHER_API_KEY") or os.getenv("GEMINI_API_KEY")
+        self.gemini_api_key = os.getenv("GEMINI_API_KEY")
         self.checklist_path = os.getenv("CHECKLIST_PATH", ".github/checklist.md")
         self.model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
         self.bot_marker = "<!-- gemini-bot-review -->" 
