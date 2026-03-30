@@ -2,199 +2,172 @@ import os
 import json
 import requests
 import sys
-import re
+import time
+from concurrent.futures import ThreadPoolExecutor
 
-# Get environment variables from GitHub Actions
-repo = os.getenv("REPO")
-pr_number = os.getenv("PR_NUMBER")
-github_token = os.getenv("GITHUB_TOKEN")
-gemini_api_key = os.getenv("GEMINI_API_KEY")
-checklist_path = os.getenv("CHECKLIST_PATH", ".github/checklist.md") 
+class PRSummarizer:
+    def __init__(self):
+        self.repo = os.getenv("REPO")
+        self.pr_number = os.getenv("PR_NUMBER")
+        self.github_token = os.getenv("GITHUB_TOKEN")
+        self.gemini_api_key = os.getenv("GEMINI_API_KEY")
+        self.checklist_path = os.getenv("CHECKLIST_PATH", ".github/checklist.md")
+        self.model_name = "gemini-1.5-flash"
+        self.bot_marker = "" # Hidden marker for finding existing comments
+        
+        if not all([self.repo, self.pr_number, self.github_token, self.gemini_api_key]):
+            print("❌ Missing required environment variables.")
+            sys.exit(1)
 
-if not all([repo, pr_number, github_token, gemini_api_key]):
-    print("Missing required environment variables.")
-    sys.exit(1)
+        self.api_headers = {
+            "Authorization": f"Bearer {self.github_token}",
+            "Accept": "application/vnd.github.v3+json"
+        }
+        self.base_url = f"https://api.github.com/repos/{self.repo}"
+        self.gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model_name}:generateContent?key={self.gemini_api_key}"
 
-# API Headers
-api_headers = {
-    "Authorization": f"Bearer {github_token}",
-    "Accept": "application/vnd.github.v3+json"
-}
-pr_metadata_url = f"https://api.github.com/repos/{repo}/pulls/{pr_number}"
+    def _safe_request(self, method, url, **kwargs):
+        """Generic request wrapper with basic retry logic."""
+        for attempt in range(3):
+            try:
+                res = requests.request(method, url, **kwargs)
+                res.raise_for_status()
+                return res
+            except Exception as e:
+                print(f"⚠️ Attempt {attempt+1} failed for {url}: {e}")
+                time.sleep(2 ** attempt)
+        return None
 
-# Fetch PR Metadata
-pr_meta = requests.get(pr_metadata_url, headers=api_headers).json()
-pr_author = pr_meta.get("user", {}).get("login", "Developer")
-requested_reviewers = [rev['login'] for rev in pr_meta.get("requested_reviewers", [])]
-base_branch = pr_meta.get("base", {}).get("ref", "main")
+    def fetch_pr_metadata(self):
+        print("Fetching PR metadata...")
+        url = f"{self.base_url}/pulls/{self.pr_number}"
+        res = self._safe_request("GET", url, headers=self.api_headers)
+        if not res: return None
+        
+        data = res.json()
+        return {
+            "author": data.get("user", {}).get("login", "Developer"),
+            "reviewers": [rev['login'] for rev in data.get("requested_reviewers", [])],
+            "base_branch": data.get("base", {}).get("ref", "main"),
+            "title": data.get("title", "this PR"),
+            "diff_url": url
+        }
 
-# Fetch the Team Checklist (Definition of Done)
-checklist_url = f"https://api.github.com/repos/{repo}/contents/{checklist_path}?ref={base_branch}"
-checklist_content = ""
-try:
-    checklist_raw_response = requests.get(checklist_url, headers={"Authorization": f"Bearer {github_token}", "Accept": "application/vnd.github.v3.raw"})
-    if checklist_raw_response.status_code == 200:
-        checklist_content = checklist_raw_response.text
-        print(f"Successfully loaded checklist from {checklist_path}")
-    else:
-        print(f"Checklist not found at {checklist_path}. Using general best practices.")
-except Exception as e:
-    print(f"Error fetching checklist: {e}. Proceeding without it.")
+    def fetch_diff(self, url):
+        print("Fetching PR diff...")
+        headers = self.api_headers.copy()
+        headers["Accept"] = "application/vnd.github.v3.diff"
+        res = self._safe_request("GET", url, headers=headers)
+        if not res: return ""
+        
+        diff = res.text
+        if len(diff) > 60000:
+            print("⚠️ Diff too large, truncating...")
+            diff = diff[:60000] + "\n\n[Diff truncated for size]"
+        return diff
 
-# Fetch the PR Diff
-diff_headers = {
-    "Authorization": f"Bearer {github_token}",
-    "Accept": "application/vnd.github.v3.diff"
-}
-diff = requests.get(pr_metadata_url, headers=diff_headers).text
+    def fetch_checklist(self, branch):
+        url = f"{self.base_url}/contents/{self.checklist_path}?ref={branch}"
+        res = self._safe_request("GET", url, headers={"Authorization": f"Bearer {self.github_token}", "Accept": "application/vnd.github.v3.raw"})
+        return res.text if res and res.status_code == 200 else "General industry best practices applied."
 
-# Truncate if diff is too large.
-if len(diff) > 60000:
-    diff = diff[:60000] + "\n\n......"
+    def get_gemini_completion(self, prompt, is_json=False):
+        payload = {"contents": [{"parts": [{"text": prompt}]}]}
+        if is_json:
+            payload["generationConfig"] = {"response_mime_type": "application/json"}
+        
+        res = self._safe_request("POST", self.gemini_url, json=payload)
+        if not res: return None
+        
+        try:
+            return res.json()['candidates'][0]['content']['parts'][0]['text']
+        except (KeyError, IndexError):
+            return None
 
-gemini_base_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_api_key}"
+    def get_existing_comment_id(self):
+        url = f"{self.base_url}/issues/{self.pr_number}/comments"
+        res = self._safe_request("GET", url, headers=self.api_headers)
+        if res:
+            for comment in res.json():
+                if self.bot_marker in comment.get("body", ""):
+                    return comment["id"]
+        return None
 
-# --- FEATURE: MULTI-PASS VERIFICATION ---
+    def update_comment(self, comment_id, body):
+        url = f"{self.base_url}/issues/comments/{comment_id}" if comment_id else f"{self.base_url}/issues/{self.pr_number}/comments"
+        method = "PATCH" if comment_id else "POST"
+        return self._safe_request(method, url, headers=self.api_headers, json={"body": body})
 
-# 1. Post the unique identifier/mentions up front to prevent duplication later.
-# (This is posted before the AI runs, ensuring the mentions are fixed).
-mentions_footer_base = f"Hey @{pr_author}" + (f" and CC Reviewers: " + " ".join([f"@{rev}" for rev in requested_reviewers]) if requested_reviewers else "")
-bot_marker = ""
-initial_posting_comment = f"{mentions_footer_base}, our agent is initiating a multi-pass technical analysis of your PR changes. Please wait.\n\n{bot_marker}"
+    def run(self):
+        # 1. Fetch Metadata and Diff
+        meta = self.fetch_pr_metadata()
+        if not meta: return
+        
+        diff = self.fetch_diff(meta['diff_url'])
+        checklist = self.fetch_checklist(meta['base_branch'])
+        
+        # 2. Concurrency: Run Summary and Hunter passes in parallel
+        print("🚀 Starting parallel analysis passes...")
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            summary_future = executor.submit(self.get_gemini_completion, 
+                f"Summarize in one short sentence what this Pull Request, titled '{meta['title']}', is attempting to achieve.")
+            
+            hunter_prompt = f"Analyze the following Git Diff for Android bugs/leaks. Output a JSON array of objects with 'path', 'line', and 'finding'.\n\n{diff}"
+            hunter_future = executor.submit(self.get_gemini_completion, hunter_prompt, is_json=True)
 
-comments_url = f"https://api.github.com/repos/{repo}/issues/{pr_number}/comments"
-comments_response = requests.get(comments_url, headers=api_headers)
-existing_agent_comment_id = None
+        pr_summary = summary_future.result() or meta['title']
+        raw_issues = hunter_future.result() or "[]"
+        
+        try:
+            potential_issues = json.loads(raw_issues)
+        except:
+            potential_issues = []
 
-if comments_response.status_code == 200:
-    for comment in comments_response.json():
-        if bot_marker in comment.get("body", ""):
-            existing_agent_comment_id = comment["id"]
-            break
+        # 3. Post "Processing" comment
+        mentions = f"Hey @{meta['author']}" + (f" and CC Reviewers: " + " ".join([f"@{r}" for r in meta['reviewers']]) if meta['reviewers'] else "")
+        initial_body = f"> **Summary:** {pr_summary}\n\n{mentions}, our agent is initiating a multi-pass technical analysis. Please wait.\n\n*⏳ Verification in progress.*"
+        
+        comment_id = self.get_existing_comment_id()
+        self.update_comment(comment_id, initial_body)
+        
+        # Give GitHub a moment to register the new comment if we just posted it
+        if not comment_id:
+            time.sleep(1)
+            comment_id = self.get_existing_comment_id()
 
-# 2. Get the PR summary first to provide quick context.
-pr_title = pr_meta.get("title", "this PR")
-quick_summary_prompt = f"""Summarize in one short sentence what this Pull Request, titled '{pr_title}', is attempting to achieve based on its description."""
-pr_summary_text = pr_title # Default to title on failure.
-try:
-    res_quick_summary = requests.post(gemini_base_url, json={"contents": [{"parts": [{"text": quick_summary_prompt}]}]}).json()
-    pr_summary_text = res_quick_summary['candidates'][0]['content']['parts'][0]['text'].strip()
-except Exception as e:
-    print(f"Failed to get quick summary: {e}")
+        # 4. Verifier Pass (Serial, depends on Hunter output)
+        print("🛡️ Starting verification pass...")
+        verifier_prompt = f"""
+        You are a Lead Android Developer. Verify these potential issues against the Diff. 
+        Discard hallucinations/formatting noise. Format as Markdown.
+        
+        ### ✅ Verification Verdict: Passed DoD
+        {checklist}
+        
+        ### 🤖 Verified Technical Feedback & Solutions
+        (List high-severity issues with code solutions)
+        
+        ### ⚠️风险 (Risks)
+        ### 🛑 Merge Verdict (🟢 LGTM, 🟡 Needs Review, 🔴 HARD STOP)
+        
+        Diff:
+        {diff}
+        
+        Hunter Findings:
+        {json.dumps(potential_issues, indent=2)}
+        """
+        final_report = self.get_gemini_completion(verifier_prompt) or "Verification failed to complete."
 
-# 3. Post/Update the initial "Processing" comment.
-final_comment_body = f"> **Summary:** {pr_summary_text}\n\n{initial_posting_comment}\n*⏳ Analysis in progress.*"
-if existing_agent_comment_id:
-    update_url = f"https://api.github.com/repos/{repo}/issues/comments/{existing_agent_comment_id}"
-    requests.patch(update_url, headers=api_headers, json={"body": final_comment_body})
-else:
-    # Post it new and capture the ID.
-    post_res = requests.post(comments_url, headers=api_headers, json={"body": final_comment_body})
-    if post_res.status_code == 201:
-        existing_agent_comment_id = post_res.json()['id']
+        # 5. Final Update
+        final_body = (
+            f"> **Summary:** {pr_summary}\n\n"
+            f"{final_report}\n\n"
+            f"---\n{mentions}, your automated PR Agent has completed a rigorous multi-pass verification.\n"
+            f"{self.bot_marker}\n"
+            f"*⏳ Reluctantly updated automatically.*"
+        )
+        self.update_comment(comment_id, final_body)
+        print("✅ Analysis complete and comment updated.")
 
-# 4. PASS 1: The "Hypersensitive Bug Hunter" Agent.
-hunter_prompt = f"""
-You are an expert Android Developer specializing in static code analysis and memory leak detection. Your role is a "Hypersensitive Bug Hunter." 
-
-Analyze the following Git Diff and identify ANY and ALL potential violations, inefficient code patterns, security risks, memory leak hazards, or issues regarding null safety.
-
- Output your findings as a raw JSON array of objects, with each object containing:
-- **`path`**: File path.
-- **`line`**: The line number the issue applies to. Use the line number from the "new" side (the + lines).
-- **`finding`**: A concise technical description of the potential issue.
-
-If no potential issues are found, return an empty array [].
-
-Output **ONLY** the raw JSON array.
-
-[Git Diff Context]
-{diff}
-"""
-
-try:
-    res_hunter = requests.post(gemini_base_url, json={"contents": [{"parts": [{"text": hunter_prompt}]}]}).json()
-    raw_hunter_json_text = res_hunter['candidates'][0]['content']['parts'][0]['text']
-    
-    # Clean the output in case the AI talked before/after the JSON.
-    clean_json_hunter = ""
-    json_match = re.search(r'\[.*\]', raw_hunter_json_text, re.DOTALL)
-    if json_match:
-        clean_json_hunter = json_match.group(0)
-    else:
-        # Fallback to the whole text if regex failed.
-        clean_json_hunter = raw_hunter_json_text.strip()
-
-    potential_issues = json.loads(clean_json_hunter)
-    print(f"Finder Agent found {len(potential_issues)} potential issues.")
-except (Exception, json.JSONDecodeError) as e:
-    print(f"Failed to parse hunter JSON: {e}")
-    # If the hunter failed, we continue with no potential issues.
-    potential_issues = []
-
-# 5. PASS 2: The "Lead Android Developer" Verifier Agent.
-verifier_prompt = f"""
-You are the cynical and highly experienced Lead Android Developer at a large enterprise. You have been given a list of potential issues in a Git Diff found by a junior AI agent. 
-
-Your role is to act as a **Verifier and Filter**. You must analyze each potential issue against the actual Git Diff. Discard any findings that are:
-- The AI hallucinated the issue or misunderstood the context.
-- The issue is overly critical of formatting or style and is not a technical or architectural risk.
-- **Inaccurate**: The AI is pointing to the wrong line.
-
-For the high-signal findings that you verify, keep them and format them constructively as a final objective report for the development team. Provide actual code refactor solutions in Markdown for verified issues.
-
-Output your final verification report in this exact Markdown format. Do not use JSON.
-
-### ✅ Verification Verdict: Passed DoD
-(Grade the PR objectively against the provided checklist. List each item. ** Adherence:** Use ✅ emoji. **Violation:** Use ❌ emoji and. If no specific checklist content is provided, state "General industry best practices applied.")
-
-
-{checklist_content if checklist_content else "No specific checklist provided."}
-
-### 🤖 Verified Technical Feedback & Solutions
-(List only the high-severity, technical, and accurate issues you verified. Provide objective critique and Markdown code blocks showing the refactor solution.)
-
-### ⚠️风险 (Risks)
-(List severe technical risks, such as crashing potential or unhandled exceptions.)
-
-### 🛑 Merge Verdict
-(Choose exactly ONE: 🟢 **LGTM**, 🟡 **Needs Review**, 🔴 **HARD STOP**, and provide a 1-sentence professional justification.)
-
-Here is the Git Diff:
-{diff}
-
-And here are the potential issues reported by the Hunter Agent:
-
-{json.dumps(potential_issues, indent=2)}
-"""
-
-# Call Gemini for the final verification report.
-try:
-    res_verified = requests.post(gemini_base_url, json={"contents": [{"parts": [{"text": verifier_prompt}]}]}).json()
-    final_verified_report_text = res_verified['candidates'][0]['content']['parts'][0]['text']
-except Exception as e:
-    print(f"Failed to generate verification report: {e}")
-    # In case of full failure on verification, we need to output something, perhaps just a standard summary as a fallback.
-    final_verified_report_text = f"### Error during verification analysis.\n\nFailed to complete the second pass of technical analysis."
-
-# 6. Final Stage: Build the full footer and update the main comment.
-# Update the original PROCESSING comment with the final verified roast.
-
-footer_prefix = f"\n---\nHey {mentions_footer_base}"
-# Provide different closing sentences based on if there were any in-line comments.
-inline_comments_url = f"https://api.github.com/repos/{repo}/pulls/{pr_number}/comments"
-inline_comments_response = requests.get(inline_comments_url, headers=api_headers)
-if inline_comments_response.status_code == 200 and inline_comments_response.json():
-    # If in-line comments exist from the script's previous iteration, we mention them.
-    # We add a sentence explaining the Multi-Pass verification.
-    final_closing = f"{footer_prefix}, your automated PR Agent has completed a rigorous multi-pass verification to ensure high-signal findings. Your roast is ready, including specific comments tailored to your code changes."
-else:
-    # If no in-line comments exist, we just say the roast is ready.
-    final_closing = f"{footer_prefix}, your automated PR Agent has completed a rigorous multi-pass verification to ensure high-signal findings. Your roast is ready."
-
-final_summary_body = f"> **Summary:** {pr_summary_text}\n\n{final_verified_report_text}\n\n{final_closing}\n{bot_marker}\n*⏳ Reluctantly updated automatically by your automated Senior Dev.*"
-
-if existing_agent_comment_id:
-    update_url = f"https://api.github.com/repos/{repo}/issues/comments/{existing_agent_comment_id}"
-    requests.patch(update_url, headers=api_headers, json={"body": final_summary_body})
-    print("Main summary comment updated with verified roast.")
+if __name__ == "__main__":
+    PRSummarizer().run()
