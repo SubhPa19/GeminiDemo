@@ -31,10 +31,6 @@ Please review and confirm the following before requesting review.
 * [ ] Observers removed when required
 * [ ] Coroutines scoped correctly
 
-## Build & CI
-
-* [ ] Project builds successfully
-
 ## Security
 
 * [ ] No API keys or secrets committed
@@ -44,7 +40,7 @@ Please review and confirm the following before requesting review.
 
 * [ ] README or documentation updated if required
 * [ ] Complex logic documented with comments
-* [ ] for new fun proper comments and jaba doc are added, if existing fun is modified update as per change
+* [ ] for new fun proper comments and java doc are added, if existing fun is modified update as per change
 
 ## PR Quality
 
@@ -52,10 +48,4 @@ Please review and confirm the following before requesting review.
 * [ ] PR description explains purpose and impact
 * [ ] Screenshots attached if UI changes
 
----
 
-### AI Review
-
-* [ ] Gemini AI PR review executed
-* [ ] Critical issues resolved
-* [ ] AI suggestions reviewed
