@@ -93,15 +93,52 @@ class PRSummarizer:
     def get_gemini_completion(self, prompt, is_json=False):
         payload = {"contents": [{"parts": [{"text": prompt}]}]}
         if is_json:
-            payload["generationConfig"] = {"response_mime_type": "application/json"}
+            payload["generationConfig"] = {
+                "response_mime_type": "application/json"
+            }
         
         res = self._safe_request("POST", self.gemini_url, json=payload)
         if not res: return None
         
         try:
-            return res.json()['candidates'][0]['content']['parts'][0]['text']
+            text = res.json()['candidates'][0]['content']['parts'][0]['text']
+            if is_json:
+                return self._parse_gemini_json(text)
+            return text
         except (KeyError, IndexError):
             return None
+
+    def _parse_gemini_json(self, text):
+        """Robustly extracts and parses JSON from Gemini's response."""
+        if not text: return None
+        
+        # Clean the text: sometimes Gemini wraps JSON in backticks despite response_mime_type
+        clean_text = text.strip()
+        if clean_text.startswith("```"):
+            # Remove markdown code blocks if present (json block or generic)
+            clean_text = re.sub(r'^```(?:json)?\s*', '', clean_text)
+            clean_text = re.sub(r'\s*```$', '', clean_text)
+        
+        try:
+            return json.loads(clean_text)
+        except json.JSONDecodeError as e:
+            print(f"⚠️ Initial JSON parse failed: {e}. Attempting extraction...")
+            # Fallback: Extract the first { ... } or [ ... ] block
+            match = re.search(r'(\{.*\}|\[.*\])', clean_text, re.DOTALL)
+            if match:
+                try:
+                    return json.loads(match.group(1))
+                except json.JSONDecodeError as e2:
+                    print(f"❌ Extraction fallback also failed: {e2}")
+            
+            # Final attempt: handle potential unescaped control characters
+            try:
+                # Replace unescaped newlines inside strings (experimental)
+                # This is risky but sometimes helps with malformed markdown fields
+                sanitized = re.sub(r'(?<!\\)\n', '\\n', clean_text)
+                return json.loads(sanitized)
+            except:
+                return None
 
     def submit_bundled_review(self, body, event, comments):
         """Submits all findings in a single Bundled Review to minimize noise."""
@@ -190,6 +227,11 @@ class PRSummarizer:
             verifier_prompt = f"""
 You are the {persona}. Verify findings and generate a dual JSON report.
 
+### **STRICT JSON REQUIREMENTS**:
+- Output MUST be valid JSON. 
+- Avoid any unescaped special characters (like double quotes or backslashes) inside string values.
+- Double check that the "markdown_report" string is correctly escaped.
+
 **REQUIRED OUTPUT JSON KEYS**:
 1. "markdown_report": Full Markdown report text (DoD table, Risks, Tests, Verdict).
 2. "verified_findings": JSON logic array [{{"path": "path", "line": 123, "critique": "text", "surgical_fix": "code"}}]
@@ -219,15 +261,11 @@ Findings: {json.dumps(potential_issues, indent=2)}
 Checklist: {checklist}
 """
             raw_verified_res = self.get_gemini_completion(verifier_prompt, is_json=True)
-            try:
-                v_data = json.loads(raw_verified_res)
-                if isinstance(v_data, list):
-                    v_data = { "verified_findings": v_data, "markdown_report": "⚠️ Findings list returned directly." }
-                elif not isinstance(v_data, dict):
-                    v_data = {}
-            except Exception as e:
-                print(f"⚠️ Failed to parse Gemini response: {e}")
-                v_data = {}
+            # Note: get_gemini_completion now returns the parsed object directly if is_json=True
+            v_data = raw_verified_res if isinstance(raw_verified_res, (dict, list)) else {}
+            
+            if not v_data:
+                print("⚠️ Verifier returned invalid or empty JSON.")
 
             # 4. Prepare bundled comments
             bundled_comments = []
