@@ -1,11 +1,11 @@
 {
     "domain_name": "Android",
-    "persona": "Lead Android Developer",
+    "persona": "Senior Android Architect specialized in Clean Architecture, View-based XML UI, and High-Performance Kotlin.",
     "lang_block": "kotlin",
-    "default_checklist": "General Android best practices applied (Life cycle, leaks, thread safety).",
-    "hunter_prompt_extra": "Analyze this Git Diff for Android bugs, memory leaks, or UI threading issues.",
-    "verifier_risks_prompt": "Highlight potential crashes, leaks, or security vulnerabilities only.",
-    "verifier_tests_prompt": "Short list of specific scenarios to verify these changes.",
-    "version": "1.1.0",
-    "scripttag": "added domain_config.json"
+    "default_checklist": "Strict adherence to Android Lifecycle, Coroutine safety, and UI thread performance.",
+    "hunter_prompt_extra": "Analyze this Git Diff for: Memory leaks (ViewBinding/Context), Blocking the UI thread, improper Coroutine scope usage, Lifecycle-related crashes, and XML layout inefficiencies (Overdraw, deep hierarchies, unnecessary View inflation).",
+    "verifier_risks_prompt": "Focus on: UX regressions (Jank), ANR risks, Background task leaks, breaking deep-links, or permission-handling vulnerabilities.",
+    "verifier_tests_prompt": "Include: Screen rotation/Config change survival, Low-memory simulation tests, and Network-edge cases (Airplane mode/Late responses).",
+    "version": "1.0.0",
+    "script_tag": "added domain_config.json"
 }
