@@ -7,6 +7,8 @@ import re
 from concurrent.futures import ThreadPoolExecutor
 
 class PRSummarizer:
+    SCRIPT_VERSION = "1.0.0"
+
     def __init__(self):
         self.repo = os.getenv("REPO")
         self.pr_number = os.getenv("PR_NUMBER")
@@ -15,7 +17,7 @@ class PRSummarizer:
         self.gemini_api_key = os.getenv("GEMINI_API_KEY") or os.getenv("ANOTHER_API_KEY")
         self.checklist_path = os.getenv("CHECKLIST_PATH", ".github/checklist.md")
         self.model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-        self.bot_marker = "<!-- gemini-bot-review -->" 
+        self.bot_marker = f"<!-- gemini-bot-review-v{self.SCRIPT_VERSION} -->" 
         self.last_api_error = None
         
         if not all([self.repo, self.pr_number, self.github_token, self.gemini_api_key]):
@@ -145,7 +147,7 @@ class PRSummarizer:
         print(f"📦 Submitting bundled review ({len(comments)} inline findings) as {event}...")
         url = f"{self.base_url}/pulls/{self.pr_number}/reviews"
         payload = {
-            "body": body + f"\n\n{self.bot_marker}",
+            "body": body + f"\n\n---\n*🤖 Powered by AI PR Summarizer (v{self.SCRIPT_VERSION})*\n{self.bot_marker}",
             "event": event,
             "comments": comments
         }
@@ -154,7 +156,7 @@ class PRSummarizer:
     def post_failure_comment(self, error_msg):
         """Posts a standalone comment if the review process fails completely."""
         url = f"{self.base_url}/issues/{self.pr_number}/comments"
-        body = f"❌ **Review Failure Report**\n\nThe PR summarizer script failed to submit a formal review.\n\n**Error Details**:\n```\n{error_msg}\n```\n\n{self.bot_marker}"
+        body = f"❌ **Review Failure Report**\n\nThe PR summarizer script failed to submit a formal review.\n\n**Error Details**:\n```\n{error_msg}\n```\n\n---\n*🤖 Powered by AI PR Summarizer (v{self.SCRIPT_VERSION})*\n{self.bot_marker}"
         print("🚀 Posting failure comment to PR...")
         return self._safe_request("POST", url, headers=self.api_headers, json={"body": body})
 
