@@ -7,7 +7,7 @@ import re
 from concurrent.futures import ThreadPoolExecutor
 
 class PRSummarizer:
-    SCRIPT_VERSION = "1.0.0"
+    SCRIPT_VERSION = "1.0.1"
 
     def __init__(self):
         self.repo = os.getenv("REPO")
@@ -147,7 +147,7 @@ class PRSummarizer:
         print(f"📦 Submitting bundled review ({len(comments)} inline findings) as {event}...")
         url = f"{self.base_url}/pulls/{self.pr_number}/reviews"
         payload = {
-            "body": body + f"\n\n---\n*🤖 Powered by AI PR Summarizer (v{self.SCRIPT_VERSION})*\n{self.bot_marker}",
+            "body": body + f"\n\n---\n*🤖 Powered by PR Bot (v{self.SCRIPT_VERSION})*\n{self.bot_marker}",
             "event": event,
             "comments": comments
         }
