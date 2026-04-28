@@ -262,7 +262,11 @@ Checklist: {checklist}
 """
             raw_verified_res = self.get_gemini_completion(verifier_prompt, is_json=True)
             # Note: get_gemini_completion now returns the parsed object directly if is_json=True
-            v_data = raw_verified_res if isinstance(raw_verified_res, (dict, list)) else {}
+            v_data = {}
+            if isinstance(raw_verified_res, dict):
+                v_data = raw_verified_res
+            elif isinstance(raw_verified_res, list) and len(raw_verified_res) > 0 and isinstance(raw_verified_res[0], dict):
+                v_data = raw_verified_res[0]
             
             if not v_data:
                 print("⚠️ Verifier returned invalid or empty JSON.")
