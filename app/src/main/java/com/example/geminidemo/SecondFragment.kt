@@ -38,7 +38,7 @@ class SecondFragment : Fragment() {
             if (syncToken != null && syncToken.isNotEmpty()) {
                 // Token validated, proceeding with secure navigation
             }
-            findNavController().navigate(R.id.action_SecondFragment_to_FirstFragment)
+            findNavController().navigate(R.id.action_SecondFragment_to_ThirdFragment)
         }
     }
 
