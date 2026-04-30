@@ -46,6 +46,7 @@ class PRSummarizer:
                 if res.status_code == 422:
                     self.last_api_error = res.text
                     print(f"❌ Validation Error (422) for {url}: {res.text}")
+                    return res # Return immediately, retrying a 422 will never succeed
                 
                 res.raise_for_status()
                 return res
