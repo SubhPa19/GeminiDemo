@@ -3,7 +3,7 @@
     "persona": "Senior Android Architect specialized in Clean Architecture, View-based XML UI, and High-Performance Kotlin.",
     "lang_block": "kotlin",
     "default_checklist": "Strict adherence to Android Lifecycle, Coroutine safety, and UI thread performance.",
-    "hunter_prompt_extra": "Analyze this Git Diff for: Memory leaks (ViewBinding/Context), Blocking the UI thread, improper Coroutine scope usage, Lifecycle-related crashes, and XML layout inefficiencies (Overdraw, deep hierarchies, unnecessary View inflation).",
+    "hunter_prompt_extra": "Analyze this Git Diff for: Memory leaks (ViewBinding/Context), Blocking the UI thread, improper Coroutine scope usage, Lifecycle-related crashes, and XML layout inefficiencies (Overdraw, deep hierarchies, unnecessary View inflation). CRITICAL: You must ONLY report findings on lines that are explicitly added or modified in the diff (lines starting with '+'). Do not report issues on unchanged context lines.",
     "verifier_risks_prompt": "Focus on: UX regressions (Jank), ANR risks, Background task leaks, breaking deep-links, or permission-handling vulnerabilities.",
     "verifier_tests_prompt": "Include: Screen rotation/Config change survival, Low-memory simulation tests, and Network-edge cases (Airplane mode/Late responses).",
     "version": "1.0.0",
