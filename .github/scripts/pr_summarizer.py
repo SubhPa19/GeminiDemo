@@ -7,7 +7,7 @@ import re
 from concurrent.futures import ThreadPoolExecutor
 
 class PRSummarizer:
-    SCRIPT_VERSION = "1.0.1"
+    SCRIPT_VERSION = "1.0.2"
 
     def __init__(self):
         self.repo = os.getenv("REPO")
@@ -236,22 +236,33 @@ You are the {persona}. Verify findings and generate a dual JSON report.
 - Double check that the "markdown_report" string is correctly escaped.
 
 **REQUIRED OUTPUT JSON KEYS**:
-1. "markdown_report": Full Markdown report text (DoD table, Risks, Tests, Verdict).
+1. "markdown_report": Full Markdown report text (DoD Check, Risks, Verdict).
 2. "verified_findings": JSON logic array [{{"path": "path", "line": 123, "critique": "text", "surgical_fix": "code"}}]
 3. "merge_verdict": 🟢 LGTM, 🟡 Needs Review, or 🔴 HARD STOP.
 
-### ✅ Verification Verdict: DoD Check (Sorted: Passed first, then Failed)
+### ✅ Verification Verdict: DoD Check
+Format the DoD Check section using HTML details/summary tags exactly like this. Make sure to include empty lines before and after the markdown tables:
+
+<details open>
+<summary><b>🔴 Failed Checks</b></summary>
+
 | Requirement | Status | Reasoning/Note |
 | :--- | :--- | :--- |
-| [Checklist Item] | ✅ / ❌ / 🟠 | [Short reasoning] |
+| [Checklist Item] | ❌ / 🟠 | [Short reasoning] |
 
-**IMPORTANT**: In the table above, YOU MUST SORT THE ROWS: list all **Passed (✅)** items first, followed by all **Failed (❌ or 🔴)** items.
+</details>
+
+<details>
+<summary><b>✅ Passed Checks</b></summary>
+
+| Requirement | Status | Reasoning/Note |
+| :--- | :--- | :--- |
+| [Checklist Item] | ✅ | [Short reasoning] |
+
+</details>
 
 ### ⚠️ Technical Risks ({domain_name} Context)
 {verifier_risks_prompt}
-
-### 🧪 Suggested Test Cases
-{verifier_tests_prompt}
 
 ### 🛑 Merge Verdict
 (Exactly ONE: 🟢 **LGTM**, 🟡 **Needs Review**, 🔴 **HARD STOP**)
