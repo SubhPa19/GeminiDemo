@@ -7,7 +7,7 @@ import re
 from concurrent.futures import ThreadPoolExecutor
 
 class PRSummarizer:
-    SCRIPT_VERSION = "1.0.2"
+    SCRIPT_VERSION = "1.0.3"
 
     def __init__(self):
         self.repo = os.getenv("REPO")
@@ -232,7 +232,9 @@ You are the {persona}. Verify findings and generate a dual JSON report.
 
 ### **STRICT JSON REQUIREMENTS**:
 - Output MUST be valid JSON. 
-- Avoid any unescaped special characters (like double quotes or backslashes) inside string values.
+- ESCAPE all newlines as `\n` inside strings. Do NOT use literal newlines.
+- ESCAPE all double quotes as `\"` inside strings.
+- Avoid using double quotes inside the markdown report if possible (use single quotes instead).
 - Double check that the "markdown_report" string is correctly escaped.
 
 **REQUIRED OUTPUT JSON KEYS**:
