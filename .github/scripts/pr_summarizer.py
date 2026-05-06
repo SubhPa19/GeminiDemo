@@ -7,7 +7,7 @@ import re
 from concurrent.futures import ThreadPoolExecutor
 
 class PRSummarizer:
-    SCRIPT_VERSION = "1.0.3"
+    SCRIPT_VERSION = "1.0.4"
 
     def __init__(self):
         self.repo = os.getenv("REPO")
@@ -243,16 +243,13 @@ You are the {persona}. Verify findings and generate a dual JSON report.
 3. "merge_verdict": 🟢 LGTM, 🟡 Needs Review, or 🔴 HARD STOP.
 
 ### ✅ Verification Verdict: DoD Check
-Format the DoD Check section using HTML details/summary tags exactly like this. Make sure to include empty lines before and after the markdown tables:
+Format the DoD Check section exactly like this. Make sure to include empty lines before and after the markdown tables:
 
-<details open>
-<summary><b>🔴 Failed Checks</b></summary>
+### 🔴 Failed Checks
 
 | Requirement | Status | Reasoning/Note |
 | :--- | :--- | :--- |
 | [Checklist Item] | ❌ / 🟠 | [Short reasoning] |
-
-</details>
 
 <details>
 <summary><b>✅ Passed Checks</b></summary>
