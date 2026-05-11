@@ -7,7 +7,7 @@ import re
 from concurrent.futures import ThreadPoolExecutor
 
 class PRSummarizer:
-    SCRIPT_VERSION = "1.0.4"
+    SCRIPT_VERSION = "1.0.5"
 
     def __init__(self):
         self.repo = os.getenv("REPO")
@@ -142,6 +142,41 @@ class PRSummarizer:
                 return json.loads(sanitized)
             except:
                 return None
+
+    def _parse_valid_lines(self, diff_text):
+        """Parses a unified diff to extract valid 'RIGHT' side line numbers for inline comments."""
+        valid_lines = {}
+        current_file = None
+        current_line_new = None
+
+        for line in diff_text.splitlines():
+            if line.startswith("diff --git "):
+                current_line_new = None
+            elif line.startswith("+++ "):
+                filepath = line[4:].strip()
+                if filepath.startswith("b/"):
+                    filepath = filepath[2:]
+                current_file = filepath.lstrip('./').lstrip('/')
+                if current_file not in valid_lines:
+                    valid_lines[current_file] = set()
+                current_line_new = None
+            elif line.startswith("@@ ") and current_file is not None:
+                try:
+                    plus_part = line.split("+")[1].split(" ")[0]
+                    start_line_str = plus_part.split(",")[0]
+                    current_line_new = int(start_line_str)
+                except Exception:
+                    current_line_new = None
+            elif current_line_new is not None:
+                if line.startswith("\\"): 
+                    continue
+                if not line or line[0] in ('+', ' '):
+                    valid_lines[current_file].add(current_line_new)
+                    current_line_new += 1
+                elif line.startswith("-"):
+                    pass
+
+        return valid_lines
 
     def submit_bundled_review(self, body, event, comments):
         """Submits all findings in a single Bundled Review to minimize noise."""
@@ -284,8 +319,12 @@ Checklist: {checklist}
             if not v_data:
                 print("⚠️ Verifier returned invalid or empty JSON.")
 
-            # 4. Prepare bundled comments
+            # 4. Parse diff for valid lines to prevent 422 errors
+            valid_lines_map = self._parse_valid_lines(diff)
+
+            # Prepare bundled comments
             bundled_comments = []
+            fallback_comments = []
             verified_findings = v_data.get('verified_findings', [])
             if isinstance(verified_findings, list):
                 for f in verified_findings:
@@ -295,8 +334,15 @@ Checklist: {checklist}
                     fix = f.get('surgical_fix', '// No fix.')
                     if path and line:
                         try:
+                            line_num = int(line)
+                            normalized_path = path.strip().lstrip('./').lstrip('/')
                             body = f"**Critique**: {critique}\n\n**Surgical Fix**:\n```{lang_block}\n{fix}\n```"
-                            bundled_comments.append({ "path": path, "line": int(line), "body": body })
+                            
+                            # Check if line is valid in the diff
+                            if normalized_path in valid_lines_map and line_num in valid_lines_map[normalized_path]:
+                                bundled_comments.append({ "path": normalized_path, "line": line_num, "body": body })
+                            else:
+                                fallback_comments.append(f"**File**: `{path}` (Line {line_num})\n{body}")
                         except: continue
 
             # 5. Determine GitHub Event (Smart Mapping)
@@ -304,7 +350,7 @@ Checklist: {checklist}
             github_event = "COMMENT"
             if "🔴" in verdict:
                 github_event = "REQUEST_CHANGES"
-            elif "🟢" in verdict and not bundled_comments:
+            elif "🟢" in verdict and not bundled_comments and not fallback_comments:
                 github_event = "APPROVE"
 
             # 6. Submit Review (with Fallback)
@@ -312,7 +358,10 @@ Checklist: {checklist}
             header = f"{author_mention}\n> **Summary:** {pr_summary_text}\n\n"
             full_body = header + v_data.get('markdown_report', "⚠️ Analysis report malformed.")
             
-            print(f"Attempting to submit review with {len(bundled_comments)} findings...")
+            if fallback_comments:
+                full_body += "\n\n### 📝 General Findings (Outside Diff)\n\n" + "\n\n---\n\n".join(fallback_comments)
+            
+            print(f"Attempting to submit review with {len(bundled_comments)} inline findings and {len(fallback_comments)} general findings...")
             res = self.submit_bundled_review(full_body, github_event, bundled_comments)
             
             if not (res and res.status_code < 300):
