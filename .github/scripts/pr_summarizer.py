@@ -7,7 +7,7 @@ import re
 from concurrent.futures import ThreadPoolExecutor
 
 class PRSummarizer:
-    SCRIPT_VERSION = "1.0.5"
+    SCRIPT_VERSION = "1.0.6"
 
     def __init__(self):
         self.repo = os.getenv("REPO")
@@ -365,8 +365,15 @@ Checklist: {checklist}
             res = self.submit_bundled_review(full_body, github_event, bundled_comments)
             
             if not (res and res.status_code < 300):
-                print("⚠️ Bundled review failed. Attempting fallback (Summary only)...")
-                error_note = f"\n\n---\n⚠️ **Review Diagnostic Info**:\nSome inline findings were skipped because the GitHub API rejected them.\n**Error**: `{self.last_api_error}`"
+                print("⚠️ Bundled review failed. Attempting fallback (Appending inline comments to body)...")
+                
+                if bundled_comments:
+                    full_body += "\n\n### 📝 Converted Inline Findings (API Rejected)\n\n"
+                    for bc in bundled_comments:
+                        full_body += f"**File**: `{bc['path']}` (Line {bc['line']})\n{bc['body']}\n\n---\n\n"
+
+                error_note = f"\n\n⚠️ **Review Diagnostic Info**:\nSome inline findings were converted to general comments because the GitHub API rejected the inline placement (e.g. diff too large).\n**Error**: `{self.last_api_error}`"
+                
                 # Fallback to COMMENT always if the specific event failed, to ensure delivery
                 res_fallback = self.submit_bundled_review(full_body + error_note, "COMMENT", [])
                 if not (res_fallback and res_fallback.status_code < 300):
