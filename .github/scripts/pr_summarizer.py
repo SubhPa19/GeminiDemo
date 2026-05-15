@@ -382,6 +382,29 @@ Checklist: {checklist}
             
             print(f"✅ {domain_name} Review submitted successfully.")
 
+            # 7. Track and Export Metrics to Google Sheets (Webhook)
+            webhook_url = os.getenv("METRICS_WEBHOOK_URL")
+            if webhook_url:
+                try:
+                    from datetime import datetime
+                    payload = {
+                        "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC"),
+                        "project": self.repo,
+                        "pr_number": self.pr_number,
+                        "author": meta.get('author', 'Unknown'),
+                        "title": pr_summary_title,
+                        "verdict": verdict,
+                        "findings_count": len(bundled_comments) + len(fallback_comments)
+                    }
+                    print(f"📤 Exporting metrics to Google Sheets webhook...")
+                    response = requests.post(webhook_url, json=payload, headers={"Content-Type": "application/json"})
+                    if response.status_code in (200, 302):
+                        print("✅ Metrics successfully pushed to Google Sheets!")
+                    else:
+                        print(f"⚠️ Webhook returned status code {response.status_code}: {response.text}")
+                except Exception as e:
+                    print(f"❌ Failed to post metrics to webhook: {e}")
+
         except Exception as e:
             print(f"💥 Fatal error: {e}")
             self.post_failure_comment(str(e))
