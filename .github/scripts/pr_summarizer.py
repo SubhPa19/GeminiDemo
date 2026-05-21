@@ -550,7 +550,7 @@ Checklist: {checklist}
                     "verdict": verdict,
                     "findings_count": len(bundled_comments) + len(fallback_comments),
                     "quick_summary": quick_summary,
-                    "pr_link": f"https://github.com/{self.gh.repo}/pull/{self.gh.pr_number}",
+                    "pr_link": f"{os.getenv('GITHUB_SERVER_URL', 'https://github.com')}/{self.gh.repo}/pull/{self.gh.pr_number}",
                     "model_name": getattr(self.llm, "model_name", "Unknown Model"),
                     "pr_size": pr_size,
                     "domain": domain_name,
