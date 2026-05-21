@@ -5,35 +5,125 @@ import sys
 import time
 import re
 from concurrent.futures import ThreadPoolExecutor
+from typing import Any, Optional, Dict, Set
 
-class PRSummarizer:
-    SCRIPT_VERSION = "1.0.6"
+# ==============================================================================
+# SCRIPT METADATA & CONSTANTS
+# ==============================================================================
+SCRIPT_VERSION = "1.2.0"
+BOT_MARKER = f"<!-- gemini-bot-review-v{SCRIPT_VERSION} -->"
 
-    def __init__(self):
-        self.repo = os.getenv("REPO")
-        self.pr_number = os.getenv("PR_NUMBER")
-        # Support both secret names used in different repos
-        self.github_token = os.getenv("GITHUB_TOKEN") or os.getenv("TOKEN_GH")
-        self.gemini_api_key = os.getenv("GEMINI_API_KEY") or os.getenv("ANOTHER_API_KEY")
-        self.checklist_path = os.getenv("CHECKLIST_PATH", ".github/checklist.md")
-        self.model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-        self.bot_marker = f"<!-- gemini-bot-review-v{self.SCRIPT_VERSION} -->" 
-        self.last_api_error = None
+# ==============================================================================
+# 1. INTERFACES & ABSTRACT-LIKE BASE CLASSES (Open/Closed Principle)
+# ==============================================================================
+class LLMClient:
+    """
+    Abstract interface defining the requirements for an LLM Client.
+    Allows easy swapping/extension to other LLM providers (e.g., OpenAI, Vertex AI)
+    without modifying the orchestration logic.
+    """
+    def get_completion(self, prompt: str, is_json: bool = False) -> Any:
+        raise NotImplementedError("LLMClient subclasses must implement get_completion.")
+
+# ==============================================================================
+# 2. CONCRETE IMPLEMENTATIONS (Single Responsibility Principle - LLM Interface)
+# ==============================================================================
+class GeminiClient(LLMClient):
+    """
+    Handles all communication and JSON sanitization for the Gemini Developer API.
+    """
+    def __init__(self, model_name: str, api_key: str):
+        self.model_name = model_name
+        self.api_key = api_key
+        self.gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model_name}:generateContent?key={self.api_key}"
+
+    def get_completion(self, prompt: str, is_json: bool = False) -> Any:
+        """
+        Sends content generation request to Gemini API and parses response.
+        """
+        payload = {"contents": [{"parts": [{"text": prompt}]}]}
+        if is_json:
+            payload["generationConfig"] = {
+                "response_mime_type": "application/json"
+            }
         
-        if not all([self.repo, self.pr_number, self.github_token, self.gemini_api_key]):
-            print("❌ Missing required environment variables (REPO, PR_NUMBER, GITHUB_TOKEN, etc.).")
-            sys.exit(1)
+        headers = {"Content-Type": "application/json"}
+        
+        # Simple retry loop for standard network/transient failures
+        for attempt in range(3):
+            try:
+                res = requests.post(self.gemini_url, json=payload, headers=headers, timeout=60)
+                res.raise_for_status()
+                response_json = res.json()
+                
+                text = response_json['candidates'][0]['content']['parts'][0]['text']
+                if is_json:
+                    return self._parse_gemini_json(text)
+                return text
+            except Exception as e:
+                print(f"⚠️ Gemini request attempt {attempt+1} failed: {e}")
+                time.sleep(2 ** attempt + 1)
+        return None
 
+    def _parse_gemini_json(self, text: str) -> Any:
+        """
+        Robustly extracts and parses JSON from Gemini's response.
+        Handles nested markdown formatting and backticks.
+        """
+        if not text:
+            return None
+        
+        clean_text = text.strip()
+        if clean_text.startswith("```"):
+            # Remove markdown code blocks if present (json block or generic)
+            clean_text = re.sub(r'^```(?:json)?\s*', '', clean_text)
+            clean_text = re.sub(r'\s*```$', '', clean_text)
+        
+        try:
+            return json.loads(clean_text)
+        except json.JSONDecodeError as e:
+            print(f"⚠️ Initial JSON parse failed: {e}. Attempting extraction...")
+            # Fallback: Extract the first { ... } or [ ... ] block
+            match = re.search(r'(\{.*\}|\[.*\])', clean_text, re.DOTALL)
+            if match:
+                try:
+                    return json.loads(match.group(1))
+                except json.JSONDecodeError as e2:
+                    print(f"❌ Extraction fallback also failed: {e2}")
+            
+            # Final attempt: handle potential unescaped control characters
+            try:
+                sanitized = re.sub(r'(?<!\\)\n', '\\n', clean_text)
+                return json.loads(sanitized)
+            except Exception as e3:
+                print(f"❌ Final fallback sanitization also failed: {e3}")
+                return None
+
+# ==============================================================================
+# 3. GITHUB REST CLIENT (Single Responsibility Principle - GitHub API Integration)
+# ==============================================================================
+class GitHubClient:
+    """
+    Handles all interactions with the GitHub REST API (fetching metadata/diffs,
+    retrying failed requests, and submitting reviews/comments).
+    """
+    def __init__(self, repo: str, pr_number: str, token: str):
+        self.repo = repo
+        self.pr_number = pr_number
+        self.token = token
+        self.last_api_error: Optional[str] = None
+        
         self.api_headers = {
-            "Authorization": f"Bearer {self.github_token}",
+            "Authorization": f"Bearer {self.token}",
             "Accept": "application/vnd.github.v3+json"
         }
         github_api_base = os.getenv("GITHUB_API_URL") or "https://api.github.com"
         self.base_url = f"{github_api_base.rstrip('/')}/repos/{self.repo}"
-        self.gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model_name}:generateContent?key={self.gemini_api_key}"
 
-    def _safe_request(self, method, url, **kwargs):
-        """Generic request wrapper with optimized 429 (Rate Limit) and 422 handling."""
+    def _safe_request(self, method: str, url: str, **kwargs) -> Optional[requests.Response]:
+        """
+        Generic request wrapper with optimized 429 (Rate Limit) and 422 handling.
+        """
         for attempt in range(5):
             try:
                 res = requests.request(method, url, **kwargs)
@@ -57,11 +147,15 @@ class PRSummarizer:
                 time.sleep(2 ** attempt + 1)
         return None
 
-    def fetch_pr_data(self):
+    def fetch_pr_data(self) -> Optional[Dict[str, Any]]:
+        """
+        Fetches basic pull request metadata.
+        """
         print("🔍 Fetching PR metadata...")
         url = f"{self.base_url}/pulls/{self.pr_number}"
         res = self._safe_request("GET", url, headers=self.api_headers)
-        if not res: return None
+        if not res: 
+            return None
         
         data = res.json()
         return {
@@ -73,81 +167,73 @@ class PRSummarizer:
             "head_sha": data.get("head", {}).get("sha")
         }
 
-    def fetch_diff(self, url):
+    def fetch_diff(self, url: str) -> str:
+        """
+        Fetches the PR's unified diff text. Truncates if it exceeds 60,000 characters.
+        """
         print("💾 Fetching PR diff...")
         headers = self.api_headers.copy()
         headers["Accept"] = "application/vnd.github.v3.diff"
         res = self._safe_request("GET", url, headers=headers)
-        if not res: return ""
+        if not res: 
+            return ""
         
         diff = res.text
         if len(diff) > 60000:
-            print("⚠️ Diff too large, truncating...")
+            print("⚠️ Diff too large, truncating to 60,000 characters...")
             diff = diff[:60000] + "\n\n[Diff truncated for size]"
         return diff
 
-    def fetch_checklist(self, branch):
-        url = f"{self.base_url}/contents/{self.checklist_path}?ref={branch}"
-        res = self._safe_request("GET", url, headers={"Authorization": f"Bearer {self.github_token}", "Accept": "application/vnd.github.v3.raw"})
+    def fetch_checklist(self, branch: str, checklist_path: str) -> Optional[str]:
+        """
+        Attempts to read the repository checklist file from the target base branch.
+        """
+        url = f"{self.base_url}/contents/{checklist_path}?ref={branch}"
+        headers = {"Authorization": f"Bearer {self.token}", "Accept": "application/vnd.github.v3.raw"}
+        res = self._safe_request("GET", url, headers=headers)
         if res and res.status_code == 200:
             return res.text
-        return None # Return None if not found
+        return None
 
-    def get_gemini_completion(self, prompt, is_json=False):
-        payload = {"contents": [{"parts": [{"text": prompt}]}]}
-        if is_json:
-            payload["generationConfig"] = {
-                "response_mime_type": "application/json"
-            }
-        
-        res = self._safe_request("POST", self.gemini_url, json=payload)
-        if not res: return None
-        
-        try:
-            text = res.json()['candidates'][0]['content']['parts'][0]['text']
-            if is_json:
-                return self._parse_gemini_json(text)
-            return text
-        except (KeyError, IndexError):
-            return None
+    def submit_bundled_review(self, body: str, event: str, comments: list) -> Optional[requests.Response]:
+        """
+        Submits all findings in a single Bundled Review to minimize developer notification noise.
+        """
+        print(f"📦 Submitting bundled review ({len(comments)} inline findings) as {event}...")
+        url = f"{self.base_url}/pulls/{self.pr_number}/reviews"
+        payload = {
+            "body": body + f"\n\n---\n*🤖 Powered by PR Bot (v{SCRIPT_VERSION})*\n{BOT_MARKER}",
+            "event": event,
+            "comments": comments
+        }
+        return self._safe_request("POST", url, headers=self.api_headers, json=payload)
 
-    def _parse_gemini_json(self, text):
-        """Robustly extracts and parses JSON from Gemini's response."""
-        if not text: return None
-        
-        # Clean the text: sometimes Gemini wraps JSON in backticks despite response_mime_type
-        clean_text = text.strip()
-        if clean_text.startswith("```"):
-            # Remove markdown code blocks if present (json block or generic)
-            clean_text = re.sub(r'^```(?:json)?\s*', '', clean_text)
-            clean_text = re.sub(r'\s*```$', '', clean_text)
-        
-        try:
-            return json.loads(clean_text)
-        except json.JSONDecodeError as e:
-            print(f"⚠️ Initial JSON parse failed: {e}. Attempting extraction...")
-            # Fallback: Extract the first { ... } or [ ... ] block
-            match = re.search(r'(\{.*\}|\[.*\])', clean_text, re.DOTALL)
-            if match:
-                try:
-                    return json.loads(match.group(1))
-                except json.JSONDecodeError as e2:
-                    print(f"❌ Extraction fallback also failed: {e2}")
-            
-            # Final attempt: handle potential unescaped control characters
-            try:
-                # Replace unescaped newlines inside strings (experimental)
-                # This is risky but sometimes helps with malformed markdown fields
-                sanitized = re.sub(r'(?<!\\)\n', '\\n', clean_text)
-                return json.loads(sanitized)
-            except:
-                return None
+    def post_failure_comment(self, error_msg: str) -> Optional[requests.Response]:
+        """
+        Posts a fallback issue comment if the main review fails to submit.
+        """
+        url = f"{self.base_url}/issues/{self.pr_number}/comments"
+        body = f"❌ **Review Failure Report**\n\nThe PR summarizer script failed to submit a formal review.\n\n**Error Details**:\n```\n{error_msg}\n```\n\n---\n*🤖 Powered by AI PR Summarizer (v{SCRIPT_VERSION})*\n{BOT_MARKER}"
+        print("🚀 Posting failure comment to PR...")
+        return self._safe_request("POST", url, headers=self.api_headers, json={"body": body})
 
-    def _parse_valid_lines(self, diff_text):
-        """Parses a unified diff to extract valid 'RIGHT' side line numbers for inline comments."""
-        valid_lines = {}
-        current_file = None
-        current_line_new = None
+# ==============================================================================
+# 4. DIFF LINE PARSER UTILITY (Single Responsibility Principle - Diff Analysis)
+# ==============================================================================
+class DiffParser:
+    """
+    Stateless utility dedicated entirely to parsing git unified diffs
+    and identifying correct line alignment.
+    """
+    @staticmethod
+    def parse_valid_lines(diff_text: str) -> Dict[str, Set[int]]:
+        """
+        Parses a unified diff to extract valid 'RIGHT' side (new/added) line numbers 
+        for inline review comments. Prevents GitHub API 422 error submissions.
+        """
+        valid_lines: Dict[str, Set[int]] = {}
+        current_file: Optional[str] = None
+        current_line_new: Optional[int] = None
 
         for line in diff_text.splitlines():
             if line.startswith("diff --git "):
@@ -178,26 +264,48 @@ class PRSummarizer:
 
         return valid_lines
 
-    def submit_bundled_review(self, body, event, comments):
-        """Submits all findings in a single Bundled Review to minimize noise."""
-        print(f"📦 Submitting bundled review ({len(comments)} inline findings) as {event}...")
-        url = f"{self.base_url}/pulls/{self.pr_number}/reviews"
-        payload = {
-            "body": body + f"\n\n---\n*🤖 Powered by PR Bot (v{self.SCRIPT_VERSION})*\n{self.bot_marker}",
-            "event": event,
-            "comments": comments
-        }
-        return self._safe_request("POST", url, headers=self.api_headers, json=payload)
+# ==============================================================================
+# 5. METRICS EXPORTER CLIENT (Single Responsibility Principle - Telemetry Webhook)
+# ==============================================================================
+class MetricsExporter:
+    """
+    Manages telemetry logging and sending review statistics to external webhook triggers.
+    """
+    @staticmethod
+    def export_metrics(webhook_url: str, payload: Dict[str, Any]) -> bool:
+        """
+        Posts review details to Google Sheets webhook endpoint.
+        """
+        try:
+            print("📤 Exporting metrics to Google Sheets webhook...")
+            response = requests.post(webhook_url, json=payload, headers={"Content-Type": "application/json"}, timeout=15)
+            if response.status_code in (200, 302):
+                print("✅ Metrics successfully pushed to Google Sheets!")
+                return True
+            else:
+                print(f"⚠️ Webhook returned status code {response.status_code}: {response.text}")
+                return False
+        except Exception as e:
+            print(f"❌ Failed to post metrics to webhook: {e}")
+            return False
 
-    def post_failure_comment(self, error_msg):
-        """Posts a standalone comment if the review process fails completely."""
-        url = f"{self.base_url}/issues/{self.pr_number}/comments"
-        body = f"❌ **Review Failure Report**\n\nThe PR summarizer script failed to submit a formal review.\n\n**Error Details**:\n```\n{error_msg}\n```\n\n---\n*🤖 Powered by AI PR Summarizer (v{self.SCRIPT_VERSION})*\n{self.bot_marker}"
-        print("🚀 Posting failure comment to PR...")
-        return self._safe_request("POST", url, headers=self.api_headers, json={"body": body})
+# ==============================================================================
+# 6. ORCHESTRATION PIPELINE (Single Responsibility & Dependency Inversion)
+# ==============================================================================
+class PRReviewOrchestrator:
+    """
+    Coordinates and drives the entire PR review pipeline. 
+    Accepts client dependencies via its constructor (Dependency Inversion).
+    """
+    def __init__(self, github_client: GitHubClient, llm_client: LLMClient):
+        self.gh = github_client
+        self.llm = llm_client
+        self.checklist_path = os.getenv("CHECKLIST_PATH", ".github/checklist.md")
 
-    def load_domain_config(self):
-        """Loads domain-specific configuration from domain_config.json."""
+    def load_domain_config(self) -> Optional[Dict[str, Any]]:
+        """
+        Loads local domain configurations from domain_config.json.
+        """
         config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "domain_config.json")
         try:
             with open(config_path, "r") as f:
@@ -206,12 +314,15 @@ class PRSummarizer:
             print(f"⚠️ Failed to load domain_config.json from {config_path}: {e}")
             return None
 
-    def run(self):
-        # 0. Load Domain Config
+    def run(self) -> None:
+        """
+        Drives the multi-stage review pipeline execution.
+        """
+        # 1. Load configuration details
         config = self.load_domain_config()
         if not config:
-            self.post_failure_comment("Missing or malformed `domain_config.json`. Analysis cancelled.")
-            return
+            self.gh.post_failure_comment("Missing or malformed `domain_config.json`. Analysis cancelled.")
+            sys.exit(1)
 
         domain_name = config.get("domain_name", "Generic")
         persona = config.get("persona", "Lead Developer")
@@ -219,48 +330,52 @@ class PRSummarizer:
         default_checklist = config.get("default_checklist", "General best practices applied.")
         hunter_prompt_extra = config.get("hunter_prompt_extra", "Analyze this Git Diff for bugs.")
         verifier_risks_prompt = config.get("verifier_risks_prompt", "Highlight potential risks.")
-        verifier_tests_prompt = config.get("verifier_tests_prompt", "Suggested test cases.")
 
         pr_summary_title = "PR Analysis"
+        
         try:
-            # 1. Fetch Metadata and Diff
-            meta = self.fetch_pr_data()
+            # 2. Fetch critical PR metadata & diff
+            meta = self.gh.fetch_pr_data()
             if not meta:
-                self.post_failure_comment("Failed to fetch PR metadata.")
-                return
+                self.gh.post_failure_comment("Failed to fetch PR metadata.")
+                sys.exit(1)
             
             pr_summary_title = meta['title']
-            diff = self.fetch_diff(meta['diff_url'])
+            diff = self.gh.fetch_diff(meta['diff_url'])
             if not diff:
-                self.post_failure_comment("PR diff is empty or could not be fetched.")
-                return
+                self.gh.post_failure_comment("PR diff is empty or could not be fetched.")
+                sys.exit(1)
 
-            checklist = self.fetch_checklist(meta['base_branch']) or default_checklist
+            # Retrieve checklist template
+            checklist = self.gh.fetch_checklist(meta['base_branch'], self.checklist_path) or default_checklist
 
-            # 2. Concurrency: Run Summary and Hunter passes in parallel
-            print(f"🚀 Starting {domain_name} Analysis passes...")
+            # 3. Concurrency Stage: Run Summary and Hunter passes in parallel
+            print(f"🚀 Starting {domain_name} Parallel Analysis passes...")
             with ThreadPoolExecutor(max_workers=2) as executor:
-                summary_prompt = f"Summarize in one short sentence what this PR titled '{meta['title']}' is attempting to achieve in the {domain_name} project. Title: {meta['title']}, Description: {meta['description']}"
-                summary_future = executor.submit(self.get_gemini_completion, summary_prompt)
+                summary_prompt = (
+                    f"Summarize in one short sentence what this PR titled '{meta['title']}' "
+                    f"is attempting to achieve in the {domain_name} project. "
+                    f"Title: {meta['title']}, Description: {meta['description']}"
+                )
+                summary_future = executor.submit(self.llm.get_completion, summary_prompt)
                 
                 hunter_prompt = f"{hunter_prompt_extra} Output a JSON array of objects with 'path', 'line', and 'finding'.\n\n{diff}"
-                hunter_future = executor.submit(self.get_gemini_completion, hunter_prompt, is_json=True)
+                hunter_future = executor.submit(self.llm.get_completion, hunter_prompt, is_json=True)
 
                 pr_summary_text = summary_future.result() or meta['title']
-                raw_issues = hunter_future.result() or "[]"
-            
-            try:
-                potential_issues = json.loads(raw_issues)
-                if isinstance(potential_issues, dict):
-                    potential_issues = (potential_issues.get('findings') or 
-                                        potential_issues.get('issues') or 
-                                        potential_issues.get('potential_issues') or [])
-                if not isinstance(potential_issues, list):
-                    potential_issues = []
-            except:
+                raw_issues = hunter_future.result() or []
+
+            potential_issues = []
+            if isinstance(raw_issues, list):
+                potential_issues = raw_issues
+            elif isinstance(raw_issues, dict):
+                potential_issues = (raw_issues.get('findings') or 
+                                    raw_issues.get('issues') or 
+                                    raw_issues.get('potential_issues') or [])
+            if not isinstance(potential_issues, list):
                 potential_issues = []
 
-            # 3. VERIFIER PASS
+            # 4. Verifier Pass: Synthesize Hunter Findings and the Code
             print(f"🛡️ Starting {domain_name} verification pass...")
             verifier_prompt = f"""
 You are the {persona}. Verify findings and generate a dual JSON report.
@@ -308,8 +423,7 @@ Diff: {diff}
 Findings: {json.dumps(potential_issues, indent=2)}
 Checklist: {checklist}
 """
-            raw_verified_res = self.get_gemini_completion(verifier_prompt, is_json=True)
-            # Note: get_gemini_completion now returns the parsed object directly if is_json=True
+            raw_verified_res = self.llm.get_completion(verifier_prompt, is_json=True)
             v_data = {}
             if isinstance(raw_verified_res, dict):
                 v_data = raw_verified_res
@@ -319,33 +433,37 @@ Checklist: {checklist}
             if not v_data:
                 print("⚠️ Verifier returned invalid or empty JSON.")
 
-            # 4. Parse diff for valid lines to prevent 422 errors
-            valid_lines_map = self._parse_valid_lines(diff)
+            # 5. Extract Valid Diff Line Numbers
+            valid_lines_map = DiffParser.parse_valid_lines(diff)
 
-            # Prepare bundled comments
+            # 6. Bundle Inline Comments
             bundled_comments = []
             fallback_comments = []
             verified_findings = v_data.get('verified_findings', [])
+            
             if isinstance(verified_findings, list):
                 for f in verified_findings:
-                    if not isinstance(f, dict): continue
+                    if not isinstance(f, dict): 
+                        continue
                     path, line = f.get('path'), f.get('line')
                     critique = f.get('critique', 'No critique.')
                     fix = f.get('surgical_fix', '// No fix.')
+                    
                     if path and line:
                         try:
                             line_num = int(line)
                             normalized_path = path.strip().lstrip('./').lstrip('/')
                             body = f"**Critique**: {critique}\n\n**Surgical Fix**:\n```{lang_block}\n{fix}\n```"
                             
-                            # Check if line is valid in the diff
+                            # Verify if the target line actually falls inside the modified diff range
                             if normalized_path in valid_lines_map and line_num in valid_lines_map[normalized_path]:
                                 bundled_comments.append({ "path": normalized_path, "line": line_num, "body": body })
                             else:
                                 fallback_comments.append(f"**File**: `{path}` (Line {line_num})\n{body}")
-                        except: continue
+                        except Exception: 
+                            continue
 
-            # 5. Determine GitHub Event (Smart Mapping)
+            # 7. Determine GitHub Event Type
             verdict = v_data.get('merge_verdict', '🟡 Needs Review')
             github_event = "COMMENT"
             if "🔴" in verdict:
@@ -353,7 +471,7 @@ Checklist: {checklist}
             elif "🟢" in verdict and not bundled_comments and not fallback_comments:
                 github_event = "APPROVE"
 
-            # 6. Submit Review (with Fallback)
+            # 8. Submit Review
             author_mention = f"@{meta['author']}"
             header = f"{author_mention}\n> **Summary:** {pr_summary_text}\n\n"
             full_body = header + v_data.get('markdown_report', "⚠️ Analysis report malformed.")
@@ -362,53 +480,65 @@ Checklist: {checklist}
                 full_body += "\n\n### 📝 General Findings (Outside Diff)\n\n" + "\n\n---\n\n".join(fallback_comments)
             
             print(f"Attempting to submit review with {len(bundled_comments)} inline findings and {len(fallback_comments)} general findings...")
-            res = self.submit_bundled_review(full_body, github_event, bundled_comments)
+            res = self.gh.submit_bundled_review(full_body, github_event, bundled_comments)
             
+            # API Fallback Logic: Bundle all comments inside the main review body if inline failed (e.g. 422 errors)
             if not (res and res.status_code < 300):
-                print("⚠️ Bundled review failed. Attempting fallback (Appending inline comments to body)...")
+                print("⚠️ Bundled review failed. Attempting fallback (Appending inline comments to main body)...")
                 
                 if bundled_comments:
                     full_body += "\n\n### 📝 Converted Inline Findings (API Rejected)\n\n"
                     for bc in bundled_comments:
                         full_body += f"**File**: `{bc['path']}` (Line {bc['line']})\n{bc['body']}\n\n---\n\n"
 
-                error_note = f"\n\n⚠️ **Review Diagnostic Info**:\nSome inline findings were converted to general comments because the GitHub API rejected the inline placement (e.g. diff too large).\n**Error**: `{self.last_api_error}`"
+                error_note = f"\n\n⚠️ **Review Diagnostic Info**:\nSome inline findings were converted to general comments because the GitHub API rejected the inline placement (e.g. diff too large).\n**Error**: `{self.gh.last_api_error}`"
                 
-                # Fallback to COMMENT always if the specific event failed, to ensure delivery
-                res_fallback = self.submit_bundled_review(full_body + error_note, "COMMENT", [])
+                res_fallback = self.gh.submit_bundled_review(full_body + error_note, "COMMENT", [])
                 if not (res_fallback and res_fallback.status_code < 300):
-                    self.post_failure_comment(self.last_api_error or "Unknown API Error")
+                    self.gh.post_failure_comment(self.gh.last_api_error or "Unknown API Error")
                     sys.exit(1)
             
             print(f"✅ {domain_name} Review submitted successfully.")
 
-            # 7. Track and Export Metrics to Google Sheets (Webhook)
+            # 9. Metrics Export Webhook Step
             webhook_url = os.getenv("METRICS_WEBHOOK_URL")
             if webhook_url:
-                try:
-                    from datetime import datetime
-                    payload = {
-                        "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC"),
-                        "project": self.repo,
-                        "pr_number": self.pr_number,
-                        "author": meta.get('author', 'Unknown'),
-                        "title": pr_summary_title,
-                        "verdict": verdict,
-                        "findings_count": len(bundled_comments) + len(fallback_comments)
-                    }
-                    print(f"📤 Exporting metrics to Google Sheets webhook...")
-                    response = requests.post(webhook_url, json=payload, headers={"Content-Type": "application/json"})
-                    if response.status_code in (200, 302):
-                        print("✅ Metrics successfully pushed to Google Sheets!")
-                    else:
-                        print(f"⚠️ Webhook returned status code {response.status_code}: {response.text}")
-                except Exception as e:
-                    print(f"❌ Failed to post metrics to webhook: {e}")
+                from datetime import datetime
+                metrics_payload = {
+                    "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC"),
+                    "project": self.gh.repo,
+                    "pr_number": self.gh.pr_number,
+                    "author": meta.get('author', 'Unknown'),
+                    "title": pr_summary_title,
+                    "verdict": verdict,
+                    "findings_count": len(bundled_comments) + len(fallback_comments)
+                }
+                MetricsExporter.export_metrics(webhook_url, metrics_payload)
 
         except Exception as e:
-            print(f"💥 Fatal error: {e}")
-            self.post_failure_comment(str(e))
+            print(f"💥 Fatal error inside pipeline: {e}")
+            self.gh.post_failure_comment(str(e))
             sys.exit(1)
 
+# ==============================================================================
+# MAIN ENTRY POINT
+# ==============================================================================
 if __name__ == "__main__":
-    PRSummarizer().run()
+    # Gather workspace context and inputs
+    repo_env = os.getenv("REPO")
+    pr_num_env = os.getenv("PR_NUMBER")
+    gh_token = os.getenv("GITHUB_TOKEN") or os.getenv("TOKEN_GH")
+    gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("ANOTHER_API_KEY")
+    model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+
+    if not all([repo_env, pr_num_env, gh_token, gemini_key]):
+        print("❌ Missing required environment variables (REPO, PR_NUMBER, GITHUB_TOKEN, GEMINI_API_KEY).")
+        sys.exit(1)
+
+    # 1. Instantiate concrete API dependency clients (SOLID DIP)
+    github_client = GitHubClient(repo=repo_env, pr_number=pr_num_env, token=gh_token)
+    gemini_client = GeminiClient(model_name=model, api_key=gemini_key)
+
+    # 2. Inject clients into orchestrator pipeline and run
+    orchestrator = PRReviewOrchestrator(github_client=github_client, llm_client=gemini_client)
+    orchestrator.run()
