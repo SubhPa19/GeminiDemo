@@ -465,6 +465,15 @@ Checklist: {checklist}
 
             # 7. Determine GitHub Event Type
             verdict = v_data.get('merge_verdict', '🟡 Needs Review')
+            
+            # Normalize verdict formatting to standard 🟢, 🟡, 🔴 circles
+            if any(x in verdict for x in ["✅", "🟢", "\u2705", "\\u2705"]) or "lgtm" in verdict.lower():
+                verdict = "🟢 LGTM"
+            elif any(x in verdict for x in ["🔴", "stop", "reject"]) or "stop" in verdict.lower():
+                verdict = "🔴 HARD STOP"
+            else:
+                verdict = "🟡 Needs Review"
+
             github_event = "COMMENT"
             if "🔴" in verdict:
                 github_event = "REQUEST_CHANGES"
