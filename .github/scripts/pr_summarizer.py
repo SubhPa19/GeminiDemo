@@ -10,7 +10,7 @@ from typing import Any, Optional, Dict, Set
 # ==============================================================================
 # SCRIPT METADATA & CONSTANTS
 # ==============================================================================
-SCRIPT_VERSION = "1.2.0"
+SCRIPT_VERSION = "1.2.1"
 BOT_MARKER = f"<!-- gemini-bot-review-v{SCRIPT_VERSION} -->"
 
 # ==============================================================================
@@ -389,7 +389,7 @@ You are the {persona}. Verify findings and generate a dual JSON report.
 
 **REQUIRED OUTPUT JSON KEYS**:
 1. "markdown_report": Full Markdown report text (DoD Check, Risks, Verdict).
-2. "verified_findings": JSON logic array [{{"path": "path", "line": 123, "critique": "text", "surgical_fix": "code"}}]
+2. "verified_findings": JSON logic array [{{"path": "path", "line": 123, "severity": "critical|minor", "critique": "text", "surgical_fix": "code"}}]
 3. "merge_verdict": 🟢 LGTM, 🟡 Needs Review, or 🔴 HARD STOP.
 
 ### ✅ Verification Verdict: DoD Check
@@ -504,14 +504,46 @@ Checklist: {checklist}
             webhook_url = os.getenv("METRICS_WEBHOOK_URL")
             if webhook_url:
                 from datetime import datetime
+                
+                # Count critical vs minor findings from verified_findings
+                critical_count = 0
+                minor_count = 0
+                if isinstance(verified_findings, list):
+                    for f in verified_findings:
+                        if isinstance(f, dict):
+                            severity = f.get("severity", "minor").lower()
+                            if "critical" in severity or "major" in severity:
+                                critical_count += 1
+                            else:
+                                minor_count += 1
+                
+                if critical_count == 0 and minor_count == 0:
+                    quick_summary = "No issues found"
+                else:
+                    quick_summary = f"Found {critical_count} critical, {minor_count} minor issues"
+                
+                # Calculate PR Size based on added/modified lines in diff
+                loc = sum(len(lines) for lines in valid_lines_map.values())
+                if loc < 50:
+                    pr_size = f"Small ({loc} LOC)"
+                elif loc < 250:
+                    pr_size = f"Medium ({loc} LOC)"
+                else:
+                    pr_size = f"Large ({loc} LOC)"
+                
                 metrics_payload = {
-                    "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC"),
+                    "date": datetime.utcnow().strftime("%Y-%m-%d"),
                     "project": self.gh.repo,
                     "pr_number": self.gh.pr_number,
                     "author": meta.get('author', 'Unknown'),
                     "title": pr_summary_title,
                     "verdict": verdict,
-                    "findings_count": len(bundled_comments) + len(fallback_comments)
+                    "findings_count": len(bundled_comments) + len(fallback_comments),
+                    "quick_summary": quick_summary,
+                    "pr_link": f"https://github.com/{self.gh.repo}/pull/{self.gh.pr_number}",
+                    "model_name": getattr(self.llm, "model_name", "Unknown Model"),
+                    "pr_size": pr_size,
+                    "domain": domain_name
                 }
                 MetricsExporter.export_metrics(webhook_url, metrics_payload)
 
