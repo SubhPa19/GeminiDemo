@@ -532,6 +532,7 @@ Checklist: {checklist}
                     pr_size = f"Large ({loc} LOC)"
                 
                 metrics_payload = {
+                    "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC"),
                     "date": datetime.utcnow().strftime("%Y-%m-%d"),
                     "project": self.gh.repo,
                     "pr_number": self.gh.pr_number,
