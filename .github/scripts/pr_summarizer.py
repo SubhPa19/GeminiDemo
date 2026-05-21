@@ -36,6 +36,8 @@ class GeminiClient(LLMClient):
         self.model_name = model_name
         self.api_key = api_key
         self.gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model_name}:generateContent?key={self.api_key}"
+        self.total_input_tokens = 0
+        self.total_output_tokens = 0
 
     def get_completion(self, prompt: str, is_json: bool = False) -> Any:
         """
@@ -56,6 +58,11 @@ class GeminiClient(LLMClient):
                 res.raise_for_status()
                 response_json = res.json()
                 
+                # Track token usage from API metadata
+                usage = response_json.get('usageMetadata', {})
+                self.total_input_tokens += usage.get('promptTokenCount', 0)
+                self.total_output_tokens += usage.get('candidatesTokenCount', 0)
+                
                 text = response_json['candidates'][0]['content']['parts'][0]['text']
                 if is_json:
                     return self._parse_gemini_json(text)
@@ -64,6 +71,20 @@ class GeminiClient(LLMClient):
                 print(f"⚠️ Gemini request attempt {attempt+1} failed: {e}")
                 time.sleep(2 ** attempt + 1)
         return None
+
+    def calculate_cost(self) -> float:
+        """
+        Calculates estimated cost based on standard Google AI Studio pricing.
+        """
+        model_lower = self.model_name.lower()
+        if "pro" in model_lower:
+            input_rate = 1.25 / 1000000  # $1.25 per 1M tokens
+            output_rate = 5.00 / 1000000 # $5.00 per 1M tokens
+        else: # Default to Flash
+            input_rate = 0.075 / 1000000 # $0.075 per 1M tokens
+            output_rate = 0.30 / 1000000 # $0.30 per 1M tokens
+            
+        return (self.total_input_tokens * input_rate) + (self.total_output_tokens * output_rate)
 
     def _parse_gemini_json(self, text: str) -> Any:
         """
@@ -540,6 +561,9 @@ Checklist: {checklist}
                 else:
                     pr_size = f"Large ({loc} LOC)"
                 
+                # Calculate total execution cost
+                cost = round(self.llm.calculate_cost(), 6) if hasattr(self.llm, "calculate_cost") else 0.0
+
                 metrics_payload = {
                     "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC"),
                     "date": datetime.utcnow().strftime("%Y-%m-%d"),
@@ -554,6 +578,7 @@ Checklist: {checklist}
                     "model_name": getattr(self.llm, "model_name", "Unknown Model"),
                     "pr_size": pr_size,
                     "domain": domain_name,
+                    "estimated_cost": cost,
                     "bot_version": SCRIPT_VERSION
                 }
                 MetricsExporter.export_metrics(webhook_url, metrics_payload)
