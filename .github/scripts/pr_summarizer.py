@@ -543,7 +543,8 @@ Checklist: {checklist}
                     "pr_link": f"https://github.com/{self.gh.repo}/pull/{self.gh.pr_number}",
                     "model_name": getattr(self.llm, "model_name", "Unknown Model"),
                     "pr_size": pr_size,
-                    "domain": domain_name
+                    "domain": domain_name,
+                    "bot_version": SCRIPT_VERSION
                 }
                 MetricsExporter.export_metrics(webhook_url, metrics_payload)
 
