@@ -10,7 +10,7 @@ from typing import Any, Optional, Dict, Set
 # ==============================================================================
 # SCRIPT METADATA & CONSTANTS
 # ==============================================================================
-SCRIPT_VERSION = "1.2.1"
+SCRIPT_VERSION = "1.3.0"
 BOT_MARKER = f"<!-- gemini-bot-review-v{SCRIPT_VERSION} -->"
 
 # ==============================================================================
@@ -339,6 +339,7 @@ class PRReviewOrchestrator:
         """
         Drives the multi-stage review pipeline execution.
         """
+        start_time = time.time()
         # 1. Load configuration details
         config = self.load_domain_config()
         if not config:
@@ -535,22 +536,32 @@ Checklist: {checklist}
             if webhook_url:
                 from datetime import datetime
                 
-                # Count critical vs minor findings from verified_findings
+                # Count critical, major, and minor findings from verified_findings
                 critical_count = 0
+                major_count = 0
                 minor_count = 0
                 if isinstance(verified_findings, list):
                     for f in verified_findings:
                         if isinstance(f, dict):
                             severity = f.get("severity", "minor").lower()
-                            if "critical" in severity or "major" in severity:
+                            if "critical" in severity:
                                 critical_count += 1
+                            elif "major" in severity:
+                                major_count += 1
                             else:
                                 minor_count += 1
                 
-                if critical_count == 0 and minor_count == 0:
+                if critical_count == 0 and major_count == 0 and minor_count == 0:
                     quick_summary = "No issues found"
                 else:
-                    quick_summary = f"Found {critical_count} critical, {minor_count} minor issues"
+                    summary_parts = []
+                    if critical_count > 0:
+                        summary_parts.append(f"{critical_count} critical")
+                    if major_count > 0:
+                        summary_parts.append(f"{major_count} major")
+                    if minor_count > 0:
+                        summary_parts.append(f"{minor_count} minor")
+                    quick_summary = f"Found {', '.join(summary_parts)} issues"
                 
                 # Calculate PR Size based on added/modified lines in diff
                 loc = sum(len(lines) for lines in valid_lines_map.values())
@@ -563,6 +574,9 @@ Checklist: {checklist}
                 
                 # Calculate total execution cost
                 cost = round(self.llm.calculate_cost(), 6) if hasattr(self.llm, "calculate_cost") else 0.0
+                
+                # Calculate total review duration
+                time_taken_seconds = round(time.time() - start_time, 2)
 
                 metrics_payload = {
                     "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC"),
@@ -573,12 +587,16 @@ Checklist: {checklist}
                     "title": pr_summary_title,
                     "verdict": verdict,
                     "findings_count": len(bundled_comments) + len(fallback_comments),
+                    "critical_findings": critical_count,
+                    "major_findings": major_count,
+                    "minor_findings": minor_count,
                     "quick_summary": quick_summary,
                     "pr_link": f"{os.getenv('GITHUB_SERVER_URL', 'https://github.com')}/{self.gh.repo}/pull/{self.gh.pr_number}",
                     "model_name": getattr(self.llm, "model_name", "Unknown Model"),
                     "pr_size": pr_size,
                     "domain": domain_name,
                     "estimated_cost": cost,
+                    "review_time": f"{time_taken_seconds}s",
                     "bot_version": SCRIPT_VERSION
                 }
                 MetricsExporter.export_metrics(webhook_url, metrics_payload)
