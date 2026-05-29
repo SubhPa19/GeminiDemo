@@ -10,7 +10,7 @@ from typing import Any, Optional, Dict, Set
 # ==============================================================================
 # SCRIPT METADATA & CONSTANTS
 # ==============================================================================
-SCRIPT_VERSION = "1.4.0"
+SCRIPT_VERSION = "1.4.1"
 BOT_MARKER = f"<!-- gemini-bot-review-v{SCRIPT_VERSION} -->"
 
 # ==============================================================================
@@ -430,20 +430,26 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
    > 
    > **Summary:** {pr_summary_text}
 
-2. **Action Items Table**:
-   Create a table summarizing all critical issues and warnings. Combine technical risks and checklist failures into this single table to prevent duplicate text:
+2. **Action Items List**:
+   Present all critical issues and warnings in a clean, bulleted list. Do NOT use a markdown table for Action Items because triple-backtick code blocks break markdown table cells. Instead, use a clean list structure with collapsible surgical fixes:
    
    ### 📋 Action Items
    
-   | Severity | File & Line | Description | Surgical Fix |
-   | :--- | :--- | :--- | :---: |
-   | [🔴 Critical / 🟡 Warning] | [[File Name]:[Line Number]]([File Link]) | [Short, punchy description of the issue] | <details><summary><b>View Fix</b></summary><br>```[lang]<br>[Single-line or micro code fix]<br>```</details> |
+   * [🔴 Critical / 🟡 Warning] | [[File Name]:[Line Number]]([File Link]) — [Short, punchy description of the issue]
+     <details>
+     <summary><b>View Fix</b></summary>
+     
+     ```[lang]
+     [Single-line or micro code fix]
+     ```
+     
+     </details>
 
 3. **Checklist Accordion**:
-   Hide the full DoD Checklist table inside a collapsible accordion:
+   Hide the full DoD Checklist table inside a collapsible accordion. Start the accordion with standard HTML tags to ensure correct rendering (do NOT put <details> inside markdown header hashes like ###):
    
-   ### <details><summary>🔍 View Full Definition of Done (DoD) Checklist Compliance</summary>
-   
+   <details>
+   <summary><b>🔍 View Full Definition of Done (DoD) Checklist Compliance</b></summary>
    <br>
    
    | Category | Requirement | Status | Details |
