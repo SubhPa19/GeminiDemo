@@ -10,7 +10,7 @@ from typing import Any, Optional, Dict, Set
 # ==============================================================================
 # SCRIPT METADATA & CONSTANTS
 # ==============================================================================
-SCRIPT_VERSION = "1.5.4"
+SCRIPT_VERSION = "1.6.1"
 BOT_MARKER = f"<!-- gemini-bot-review-v{SCRIPT_VERSION} -->"
 
 # ==============================================================================
@@ -430,57 +430,63 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
    > 
    > **Summary:** {pr_summary_text}
 
-2. **Action Items List**:
-   Present all critical issues and warnings in a clean, bulleted list. Do NOT use a markdown table for Action Items because triple-backtick code blocks break markdown table cells. Instead, use a clean list structure with collapsible surgical fixes. Ensure that the severity tags are strictly formatted using bold asterisks as `🔴 **Critical**` or `🟡 **Warning**` (with NO enclosing square brackets like '[🔴 Critical]'):
+2. **Action Items Cards**:
+   Present all critical issues and warnings as individual "card" callout blocks to create clean visual boundaries. Group them under '### 📋 Action Items'. Wrap each action item inside its own GitHub-style alert block based on severity (with NO enclosing square brackets like '[🔴 Critical]'):
+   - For '🔴 Critical', wrap inside '> [!CAUTION]'
+   - For '🟡 Warning', wrap inside '> [!WARNING]'
    
    ### 📋 Action Items
    
-   * 🔴 **Critical** (or 🟡 **Warning**) | [[File Name]:[Line Number]]([File Link]) — [Short, punchy description of the issue]
-     <details>
-     <summary><b>View Fix</b></summary>
-     
-     ```[lang]
-     [Single-line or micro code fix]
-     ```
-     
-     </details>
+   Structure inside each block:
+   > [!CAUTION] (or !WARNING)
+   > 🔴 **Critical** (or 🟡 **Warning**) | [[File Name]:[Line Number]]([File Link])
+   > **[Issue Category Name]**: [Short, punchy description of the issue]
+   > 
+   > <details>
+   > <summary><b>View Surgical Fix</b></summary>
+   > <br>
+   > 
+   > ```[lang]
+   > [Single-line or micro code fix]
+   > ```
+   > 
+   > </details>
 
 3. **Checklist Accordions (DoD)**:
-   Wrap the entire Definition of Done (DoD) checklist inside a single main collapsible `<details>` accordion. Inside this accordion, group and present the compliance checklist in three separate sections sorted by status (Failed, Warnings, Passed):
+   Wrap the entire Definition of Done (DoD) checklist inside a single main collapsible `<details>` accordion. Inside this accordion, group and present the compliance checklist in three separate sections sorted by status (Failed, Warnings, Passed).
+   
+   Ensure you output EXACTLY the following structure inside the `<details>` tag (do NOT output any instruction bullet points or introductory list items like '- Failed Checks' or '- Warnings'):
    
    <details>
    <summary><b>🔍 View Full Definition of Done (DoD) Checklist Compliance</b></summary>
    <br>
    
-   - **Failed Checks (DoD)** (Must be a standard markdown table, NOT collapsible, always visible at the top):
-     ### 🔴 Failed Checks (DoD)
-     
-     | Category | Requirement | Details |
-     | :--- | :--- | :--- |
-     | [Category] | [Requirement Description] | [Failure Details] |
-     
-   - **Warnings (DoD)** (Must be a standard markdown table inside a details block that is OPEN by default using `<details open>`):
-     <details open>
-     <summary><b>🟡 Warnings (DoD)</b></summary>
-     <br>
-     
-     | Category | Requirement | Details |
-     | :--- | :--- | :--- |
-     | [Category] | [Requirement Description] | [Warning Details] |
-     
-     </details>
-     
-   - **Passed Checks (DoD)** (Must be a standard markdown table inside a details block that is COLLAPSED by default using `<details>`):
-     <details>
-     <summary><b>✅ Passed Checks (DoD)</b></summary>
-     <br>
-     
-     | Category | Requirement | Details |
-     | :--- | :--- | :--- |
-     | [Category] | [Requirement Description] | [Brief notes e.g. 'Meets standards'] |
-     
-     </details>
-     
+   ### 🔴 Failed Checks (DoD)
+   
+   | Category | Requirement | Details |
+   | :--- | :--- | :--- |
+   | [Category] | [Requirement Description] | [Failure Details] |
+   
+   <details open>
+   <summary><b>🟡 Warnings (DoD)</b></summary>
+   <br>
+   
+   | Category | Requirement | Details |
+   | :--- | :--- | :--- |
+   | [Category] | [Requirement Description] | [Warning Details] |
+   
+   </details>
+   
+   <details>
+   <summary><b>✅ Passed Checks (DoD)</b></summary>
+   <br>
+   
+   | Category | Requirement | Details |
+   | :--- | :--- | :--- |
+   | [Category] | [Requirement Description] | [Brief notes e.g. 'Meets standards'] |
+   
+   </details>
+   
    </details>
 
 ---
