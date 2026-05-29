@@ -10,7 +10,7 @@ from typing import Any, Optional, Dict, Set
 # ==============================================================================
 # SCRIPT METADATA & CONSTANTS
 # ==============================================================================
-SCRIPT_VERSION = "1.4.1"
+SCRIPT_VERSION = "1.5.4"
 BOT_MARKER = f"<!-- gemini-bot-review-v{SCRIPT_VERSION} -->"
 
 # ==============================================================================
@@ -425,17 +425,17 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
    
    Structure inside the block:
    > [!CAUTION] (or !WARNING / !NOTE)
-   > ### [Verdict Emoji] [Verdict Name]
-   > [1-sentence professional justification].
+   > ### **[Verdict Emoji] Merge Verdict**
+   > [1-sentence professional justification (e.g. 'This PR introduces multiple critical issues...' or 'This PR is fully compliant and ready to merge')].
    > 
    > **Summary:** {pr_summary_text}
 
 2. **Action Items List**:
-   Present all critical issues and warnings in a clean, bulleted list. Do NOT use a markdown table for Action Items because triple-backtick code blocks break markdown table cells. Instead, use a clean list structure with collapsible surgical fixes:
+   Present all critical issues and warnings in a clean, bulleted list. Do NOT use a markdown table for Action Items because triple-backtick code blocks break markdown table cells. Instead, use a clean list structure with collapsible surgical fixes. Ensure that the severity tags are strictly formatted using bold asterisks as `🔴 **Critical**` or `🟡 **Warning**` (with NO enclosing square brackets like '[🔴 Critical]'):
    
    ### 📋 Action Items
    
-   * [🔴 Critical / 🟡 Warning] | [[File Name]:[Line Number]]([File Link]) — [Short, punchy description of the issue]
+   * 🔴 **Critical** (or 🟡 **Warning**) | [[File Name]:[Line Number]]([File Link]) — [Short, punchy description of the issue]
      <details>
      <summary><b>View Fix</b></summary>
      
@@ -445,17 +445,42 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
      
      </details>
 
-3. **Checklist Accordion**:
-   Hide the full DoD Checklist table inside a collapsible accordion. Start the accordion with standard HTML tags to ensure correct rendering (do NOT put <details> inside markdown header hashes like ###):
+3. **Checklist Accordions (DoD)**:
+   Wrap the entire Definition of Done (DoD) checklist inside a single main collapsible `<details>` accordion. Inside this accordion, group and present the compliance checklist in three separate sections sorted by status (Failed, Warnings, Passed):
    
    <details>
    <summary><b>🔍 View Full Definition of Done (DoD) Checklist Compliance</b></summary>
    <br>
    
-   | Category | Requirement | Status | Details |
-   | :--- | :--- | :---: | :--- |
-   | [Category] | [Requirement Description] | [✅ / ❌ / 🟡] | [Brief 1-sentence notes or 'Meets standards'] |
-   
+   - **Failed Checks (DoD)** (Must be a standard markdown table, NOT collapsible, always visible at the top):
+     ### 🔴 Failed Checks (DoD)
+     
+     | Category | Requirement | Details |
+     | :--- | :--- | :--- |
+     | [Category] | [Requirement Description] | [Failure Details] |
+     
+   - **Warnings (DoD)** (Must be a standard markdown table inside a details block that is OPEN by default using `<details open>`):
+     <details open>
+     <summary><b>🟡 Warnings (DoD)</b></summary>
+     <br>
+     
+     | Category | Requirement | Details |
+     | :--- | :--- | :--- |
+     | [Category] | [Requirement Description] | [Warning Details] |
+     
+     </details>
+     
+   - **Passed Checks (DoD)** (Must be a standard markdown table inside a details block that is COLLAPSED by default using `<details>`):
+     <details>
+     <summary><b>✅ Passed Checks (DoD)</b></summary>
+     <br>
+     
+     | Category | Requirement | Details |
+     | :--- | :--- | :--- |
+     | [Category] | [Requirement Description] | [Brief notes e.g. 'Meets standards'] |
+     
+     </details>
+     
    </details>
 
 ---
