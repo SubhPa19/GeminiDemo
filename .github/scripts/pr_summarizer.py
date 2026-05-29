@@ -426,7 +426,7 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
    Structure inside the block (exact markdown):
    > [!CAUTION] (or !WARNING / !NOTE)
    > ### [Verdict Emoji] **Merge Verdict: [Verdict Status]** (Replace with correct emoji and verdict status: 🔴 **Merge Verdict: HARD STOP**, 🟡 **Merge Verdict: Needs Review**, or 🟢 **Merge Verdict: LGTM**)
-   > [1-sentence professional justification (e.g., 'This PR introduces multiple critical issues...' or 'This PR is fully compliant and ready to merge')].
+   > [1-sentence professional justification. IMPORTANT: You MUST explicitly highlight the counts of critical stability/security issues in bold (e.g., 'This PR introduces **3 critical stability/security issues** and **3 warnings**' or 'This PR has **0 critical issues**'). Ensure key metrics like critical issues, memory leaks, and NullPointerException counts are ALWAYS bolded so they stand out at first glance].
    > 
    > **Summary:** {pr_summary_text}
 
@@ -440,17 +440,17 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
    * 🟡 **Warning** | [[File Name]:[Line Number]]([Relative File Path]#L[Line Number]) — **[Issue Category Name]**: [Short, punchy description of the issue]
 
 3. **Checklist Accordions (DoD)**:
-   Wrap the entire Definition of Done (DoD) checklist inside a single main collapsible `<details>` accordion. Inside this accordion, group and present the compliance checklist in three separate sections sorted by status (Failed, Warnings, Passed).
+   Wrap the entire Definition of Done (DoD) checklist inside a single main collapsible `<details open>` accordion (open by default). Inside this accordion, group and present the compliance checklist in three separate sections sorted by status (Failed, Warnings, Passed).
    
-   Ensure you output EXACTLY the following structure inside the `<details>` tag (do NOT output any instruction bullet points or introductory list items like '- Failed Checks' or '- Warnings'):
+   Ensure you output EXACTLY the following structure inside the `<details open>` tag (do NOT output any instruction bullet points or introductory list items like '- Failed Checks' or '- Warnings'):
    
-   <details>
-   <summary><b>🔍 View Full Definition of Done (DoD) Checklist Compliance</b></summary>
+   <details open>
+   <summary><b>🔍 DoD Checklist Compliance</b></summary>
    <br>
    
    ### 🔴 Failed Checks (DoD)
    
-   | Category | Requirement | Details |
+   | Category&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | Requirement | Details |
    | :--- | :--- | :--- |
    | [Category] | [Requirement Description] | [Failure Details] |
    
@@ -458,7 +458,7 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
    <summary><b>🟡 Warnings (DoD)</b></summary>
    <br>
    
-   | Category | Requirement | Details |
+   | Category&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | Requirement | Details |
    | :--- | :--- | :--- |
    | [Category] | [Requirement Description] | [Warning Details] |
    
@@ -468,7 +468,7 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
    <summary><b>✅ Passed Checks (DoD)</b></summary>
    <br>
    
-   | Category | Requirement | Details |
+   | Category&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | Requirement | Details |
    | :--- | :--- | :--- |
    | [Category] | [Requirement Description] | [Brief notes e.g. 'Meets standards'] |
    
