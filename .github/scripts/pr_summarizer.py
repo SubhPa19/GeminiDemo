@@ -10,7 +10,7 @@ from typing import Any, Optional, Dict, Set
 # ==============================================================================
 # SCRIPT METADATA & CONSTANTS
 # ==============================================================================
-SCRIPT_VERSION = "1.6.1"
+SCRIPT_VERSION = "1.7.0"
 BOT_MARKER = f"<!-- gemini-bot-review-v{SCRIPT_VERSION} -->"
 
 # ==============================================================================
@@ -419,38 +419,25 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
 
 1. **Top Alert Block**:
    Wrap the verdict, justification, and summary inside a single GitHub-style alert block:
-   - For '🔴 HARD STOP', use '> [!CAUTION]'
-   - For '🟡 Needs Review', use '> [!WARNING]'
-   - For '🟢 LGTM', use '> [!NOTE]'
+   - For '🔴 HARD STOP', use '> [!CAUTION]' and the exact title '> ### 🔴 **Merge Verdict: HARD STOP**'
+   - For '🟡 Needs Review', use '> [!WARNING]' and the exact title '> ### 🟡 **Merge Verdict: Needs Review**'
+   - For '🟢 LGTM', use '> [!NOTE]' and the exact title '> ### 🟢 **Merge Verdict: LGTM**'
    
-   Structure inside the block:
+   Structure inside the block (exact markdown):
    > [!CAUTION] (or !WARNING / !NOTE)
-   > ### **[Verdict Emoji] Merge Verdict**
-   > [1-sentence professional justification (e.g. 'This PR introduces multiple critical issues...' or 'This PR is fully compliant and ready to merge')].
+   > ### [Verdict Emoji] **Merge Verdict: [Verdict Status]** (Replace with correct emoji and verdict status: 🔴 **Merge Verdict: HARD STOP**, 🟡 **Merge Verdict: Needs Review**, or 🟢 **Merge Verdict: LGTM**)
+   > [1-sentence professional justification (e.g., 'This PR introduces multiple critical issues...' or 'This PR is fully compliant and ready to merge')].
    > 
    > **Summary:** {pr_summary_text}
 
-2. **Action Items Cards**:
-   Present all critical issues and warnings as individual "card" callout blocks to create clean visual boundaries. Group them under '### 📋 Action Items'. Wrap each action item inside its own GitHub-style alert block based on severity (with NO enclosing square brackets like '[🔴 Critical]'):
-   - For '🔴 Critical', wrap inside '> [!CAUTION]'
-   - For '🟡 Warning', wrap inside '> [!WARNING]'
+2. **Action Items Punch List**:
+   Present all critical issues and warnings as a highly compact, single-line bulleted list under '### 📋 Action Items'. Do not use blockquotes, card boxes, or expandable details blocks for this section. Maintain a clean, flat list where each line contains the severity emoji/label, file link with line anchor, and a very short description.
    
+   Structure inside the list:
    ### 📋 Action Items
    
-   Structure inside each block:
-   > [!CAUTION] (or !WARNING)
-   > 🔴 **Critical** (or 🟡 **Warning**) | [[File Name]:[Line Number]]([File Link])
-   > **[Issue Category Name]**: [Short, punchy description of the issue]
-   > 
-   > <details>
-   > <summary><b>View Surgical Fix</b></summary>
-   > <br>
-   > 
-   > ```[lang]
-   > [Single-line or micro code fix]
-   > ```
-   > 
-   > </details>
+   * 🔴 **Critical** | [[File Name]:[Line Number]]([Relative File Path]#L[Line Number]) — **[Issue Category Name]**: [Short, punchy description of the issue]
+   * 🟡 **Warning** | [[File Name]:[Line Number]]([Relative File Path]#L[Line Number]) — **[Issue Category Name]**: [Short, punchy description of the issue]
 
 3. **Checklist Accordions (DoD)**:
    Wrap the entire Definition of Done (DoD) checklist inside a single main collapsible `<details>` accordion. Inside this accordion, group and present the compliance checklist in three separate sections sorted by status (Failed, Warnings, Passed).
