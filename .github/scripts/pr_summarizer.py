@@ -10,7 +10,7 @@ from typing import Any, Optional, Dict, Set
 # ==============================================================================
 # SCRIPT METADATA & CONSTANTS
 # ==============================================================================
-SCRIPT_VERSION = "1.3.1"
+SCRIPT_VERSION = "1.4.0"
 BOT_MARKER = f"<!-- gemini-bot-review-v{SCRIPT_VERSION} -->"
 
 # ==============================================================================
@@ -410,34 +410,47 @@ You are the {persona}. Verify findings and generate a dual JSON report.
 - Double check that the "markdown_report" string is correctly escaped.
 
 **REQUIRED OUTPUT JSON KEYS**:
-1. "markdown_report": Full Markdown report text (DoD Check, Risks, Verdict).
+1. "markdown_report": Full Markdown report text formatted EXACTLY as described below.
 2. "verified_findings": JSON logic array [{{"path": "path", "line": 123, "severity": "critical|minor", "critique": "text", "surgical_fix": "code"}}]
 3. "merge_verdict": 🟢 LGTM, 🟡 Needs Review, or 🔴 HARD STOP.
 
-### ✅ Verification Verdict: DoD Check
-Format the DoD Check section exactly like this. Make sure to include empty lines before and after the markdown tables:
+### 📋 Formatting Guide for "markdown_report":
+Construct the "markdown_report" to be extremely concise, visual, and action-oriented. Do not write long paragraphs of text.
 
-### 🔴 Failed Checks
+1. **Top Alert Block**:
+   Wrap the verdict, justification, and summary inside a single GitHub-style alert block:
+   - For '🔴 HARD STOP', use '> [!CAUTION]'
+   - For '🟡 Needs Review', use '> [!WARNING]'
+   - For '🟢 LGTM', use '> [!NOTE]'
+   
+   Structure inside the block:
+   > [!CAUTION] (or !WARNING / !NOTE)
+   > ### [Verdict Emoji] [Verdict Name]
+   > [1-sentence professional justification].
+   > 
+   > **Summary:** {pr_summary_text}
 
-| Requirement | Status | Reasoning/Note |
-| :--- | :--- | :--- |
-| [Checklist Item] | ❌ / 🟠 | [Short reasoning] |
+2. **Action Items Table**:
+   Create a table summarizing all critical issues and warnings. Combine technical risks and checklist failures into this single table to prevent duplicate text:
+   
+   ### 📋 Action Items
+   
+   | Severity | File & Line | Description | Surgical Fix |
+   | :--- | :--- | :--- | :---: |
+   | [🔴 Critical / 🟡 Warning] | [[File Name]:[Line Number]]([File Link]) | [Short, punchy description of the issue] | <details><summary><b>View Fix</b></summary><br>```[lang]<br>[Single-line or micro code fix]<br>```</details> |
 
-<details>
-<summary><b>✅ Passed Checks</b></summary>
-
-| Requirement | Status | Reasoning/Note |
-| :--- | :--- | :--- |
-| [Checklist Item] | ✅ | [Short reasoning] |
-
-</details>
-
-### ⚠️ Technical Risks ({domain_name} Context)
-{verifier_risks_prompt}
-
-### 🛑 Merge Verdict
-(Exactly ONE: 🟢 **LGTM**, 🟡 **Needs Review**, 🔴 **HARD STOP**)
-[1-sentence professional justification].
+3. **Checklist Accordion**:
+   Hide the full DoD Checklist table inside a collapsible accordion:
+   
+   ### <details><summary>🔍 View Full Definition of Done (DoD) Checklist Compliance</summary>
+   
+   <br>
+   
+   | Category | Requirement | Status | Details |
+   | :--- | :--- | :---: | :--- |
+   | [Category] | [Requirement Description] | [✅ / ❌ / 🟡] | [Brief 1-sentence notes or 'Meets standards'] |
+   
+   </details>
 
 ---
 
@@ -504,7 +517,7 @@ Checklist: {checklist}
 
             # 8. Submit Review
             author_mention = f"@{meta['author']}"
-            header = f"{author_mention}\n> **Summary:** {pr_summary_text}\n\n"
+            header = f"{author_mention}\n\n"
             full_body = header + v_data.get('markdown_report', "⚠️ Analysis report malformed.")
             
             if fallback_comments:
