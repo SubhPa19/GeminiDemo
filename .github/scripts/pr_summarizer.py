@@ -450,7 +450,7 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
    
    ### 🔴 Failed Checks (DoD)
    
-   | Category&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | Requirement | Details |
+   | Category&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | Requirement | Details |
    | :--- | :--- | :--- |
    | [Category] | [Requirement Description] | [Failure Details] |
    
@@ -458,7 +458,7 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
    <summary><b>🟡 Warnings (DoD)</b></summary>
    <br>
    
-   | Category&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | Requirement | Details |
+   | Category&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | Requirement | Details |
    | :--- | :--- | :--- |
    | [Category] | [Requirement Description] | [Warning Details] |
    
@@ -468,7 +468,7 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
    <summary><b>✅ Passed Checks (DoD)</b></summary>
    <br>
    
-   | Category&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | Requirement | Details |
+   | Category&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | Requirement | Details |
    | :--- | :--- | :--- |
    | [Category] | [Requirement Description] | [Brief notes e.g. 'Meets standards'] |
    
