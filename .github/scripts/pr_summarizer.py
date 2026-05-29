@@ -423,56 +423,66 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
    - For '🟡 Needs Review', use '> [!WARNING]' and the exact title '> ### 🟡 **Merge Verdict: Needs Review**'
    - For '🟢 LGTM', use '> [!NOTE]' and the exact title '> ### 🟢 **Merge Verdict: LGTM**'
    
+   **STRICT METRIC BOLDING RULE**:
+   Inside the 1-sentence professional justification, you MUST explicitly highlight the counts of critical stability/security issues and warnings in bold. For example, you MUST write: "This PR introduces **6 critical stability/security issues** and **2 warnings**." or similar. The numbers and the words "critical stability/security issues" and "warnings" MUST be wrapped in `**` to render in bold.
+   
    Structure inside the block (exact markdown):
    > [!CAUTION] (or !WARNING / !NOTE)
-   > ### [Verdict Emoji] **Merge Verdict: [Verdict Status]** (Replace with correct emoji and verdict status: 🔴 **Merge Verdict: HARD STOP**, 🟡 **Merge Verdict: Needs Review**, or 🟢 **Merge Verdict: LGTM**)
-   > [1-sentence professional justification. IMPORTANT: You MUST explicitly highlight the counts of critical stability/security issues in bold (e.g., 'This PR introduces **3 critical stability/security issues** and **3 warnings**' or 'This PR has **0 critical issues**'). Ensure key metrics like critical issues, memory leaks, and NullPointerException counts are ALWAYS bolded so they stand out at first glance].
+   > ### [Verdict Emoji] **Merge Verdict: [Verdict Status]**
+   > [1-sentence justification with bolded metrics, e.g.: This PR introduces **6 critical stability/security issues** and **2 warnings**...]
    > 
    > **Summary:** {pr_summary_text}
+   
+   Follow this top alert block immediately with a divider line:
+   ---
 
 2. **Action Items Punch List**:
-   Present all critical issues and warnings as a highly compact, single-line bulleted list under '### 📋 Action Items'. Do not use blockquotes, card boxes, or expandable details blocks for this section. Maintain a clean, flat list where each line contains the severity emoji/label, file link with line anchor, and a very short description.
+   Present all critical issues and warnings as a highly compact, single-line bulleted list under '## 📋 Action Items'. Do not use blockquotes, card boxes, or expandable details blocks for this section. Maintain a clean, flat list where each line contains the severity emoji/label, file link with line anchor, and a very short description.
    
    Structure inside the list:
-   ### 📋 Action Items
+   ## 📋 Action Items
    
    * 🔴 **Critical** | [[File Name]:[Line Number]]([Relative File Path]#L[Line Number]) — **[Issue Category Name]**: [Short, punchy description of the issue]
    * 🟡 **Warning** | [[File Name]:[Line Number]]([Relative File Path]#L[Line Number]) — **[Issue Category Name]**: [Short, punchy description of the issue]
+   
+   Follow this action items section immediately with a divider line:
+   ---
 
 3. **Checklist Accordions (DoD)**:
-   Wrap the entire Definition of Done (DoD) checklist inside a single main collapsible `<details open>` accordion (open by default). Inside this accordion, group and present the compliance checklist in three separate sections sorted by status (Failed, Warnings, Passed).
+   Present the Definition of Done (DoD) compliance checklist inside a main collapsible `<details open>` accordion (open by default). To establish proper typography hierarchy and prevent line breaks/arrow splitting, wrap the main title `🔍 DoD Checklist Compliance` inside `<summary><b><font size="5">...</font></b></summary>` to make it render in inline H2 font size with the arrow toggle directly next to it on the same line.
+   
+   **STRICT NO-SQUEEZE/NO-WRAP RULE**:
+   To prevent Category column squeezing and ugly word wrapping in GitHub markdown tables on mobile or desktop viewports, you MUST wrap every single Category name inside a `<nobr>` tag in the table rows (e.g. `| <nobr>Memory & Lifecycle</nobr> |` or `| <nobr>Performance</nobr> |`).
    
    Ensure you output EXACTLY the following structure inside the `<details open>` tag (do NOT output any instruction bullet points or introductory list items like '- Failed Checks' or '- Warnings'):
    
    <details open>
-   <summary><b>🔍 DoD Checklist Compliance</b></summary>
+   <summary><b><font size="5">🔍 DoD Checklist Compliance</font></b></summary>
    <br>
    
    ### 🔴 Failed Checks (DoD)
    
-   | Category&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | Requirement | Details |
+   | <nobr>Category&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</nobr> | Requirement | Details |
    | :--- | :--- | :--- |
-   | [Category] | [Requirement Description] | [Failure Details] |
+   | <nobr>[Category]</nobr> | [Requirement Description] | [Failure Details] |
    
-   <details open>
-   <summary><b>🟡 Warnings (DoD)</b></summary>
-   <br>
-   
-   | Category&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | Requirement | Details |
-   | :--- | :--- | :--- |
-   | [Category] | [Requirement Description] | [Warning Details] |
-   
-   </details>
-   
-   <details>
-   <summary><b>✅ Passed Checks (DoD)</b></summary>
-   <br>
-   
-   | Category&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | Requirement | Details |
-   | :--- | :--- | :--- |
-   | [Category] | [Requirement Description] | [Brief notes e.g. 'Meets standards'] |
-   
-   </details>
+    <details open>
+    <summary><b><font size="4">🟡 Warnings (DoD)</font></b></summary>
+    
+    | <nobr>Category&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</nobr> | Requirement | Details |
+    | :--- | :--- | :--- |
+    | <nobr>[Category]</nobr> | [Requirement Description] | [Warning Details] |
+    
+    </details>
+    
+    <details>
+    <summary><b><font size="4">✅ Passed Checks (DoD)</font></b></summary>
+    
+    | <nobr>Category&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</nobr> | Requirement | Details |
+    | :--- | :--- | :--- |
+    | <nobr>[Category]</nobr> | [Requirement Description] | [Brief notes e.g. 'Meets standards'] |
+    
+    </details>
    
    </details>
 
