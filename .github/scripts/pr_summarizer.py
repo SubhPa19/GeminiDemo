@@ -10,7 +10,7 @@ from typing import Any, Optional, Dict, Set
 # ==============================================================================
 # SCRIPT METADATA & CONSTANTS
 # ==============================================================================
-SCRIPT_VERSION = "1.3.0"
+SCRIPT_VERSION = "1.3.1"
 BOT_MARKER = f"<!-- gemini-bot-review-v{SCRIPT_VERSION} -->"
 
 # ==============================================================================
@@ -223,7 +223,7 @@ class GitHubClient:
         print(f"📦 Submitting bundled review ({len(comments)} inline findings) as {event}...")
         url = f"{self.base_url}/pulls/{self.pr_number}/reviews"
         payload = {
-            "body": body + f"\n\n---\n*🤖 Powered by PR Bot (v{SCRIPT_VERSION})* | [⚡ **Critique the Critic: Rate my reviews & suggest features!**](https://forms.gle/bpRX129ku5YMi9JLA)\n{BOT_MARKER}",
+            "body": body + f"\n\n---\n🤖 **Grace-{SCRIPT_VERSION}** | [Share Feedback](https://forms.gle/bpRX129ku5YMi9JLA) | [Walkthrough & Guide](https://drive.google.com/file/d/1paA9hswGG1MazQF_0WBvrZD9sKBUscOy/view?usp=drive_link)\n{BOT_MARKER}",
             "event": event,
             "comments": comments
         }
@@ -234,7 +234,7 @@ class GitHubClient:
         Posts a fallback issue comment if the main review fails to submit.
         """
         url = f"{self.base_url}/issues/{self.pr_number}/comments"
-        body = f"❌ **Review Failure Report**\n\nThe PR summarizer script failed to submit a formal review.\n\n**Error Details**:\n```\n{error_msg}\n```\n\n---\n*🤖 Powered by PR Bot (v{SCRIPT_VERSION})* | [⚡ **Critique the Critic: Rate my reviews & suggest features!**](https://forms.gle/bpRX129ku5YMi9JLA)\n{BOT_MARKER}"
+        body = f"❌ **Review Failure Report**\n\nThe PR summarizer script failed to submit a formal review.\n\n**Error Details**:\n```\n{error_msg}\n```\n\n---\n🤖 **Grace-{SCRIPT_VERSION}** | [Share Feedback](https://forms.gle/bpRX129ku5YMi9JLA) | [Walkthrough & Guide](https://drive.google.com/file/d/1paA9hswGG1MazQF_0WBvrZD9sKBUscOy/view?usp=drive_link)\n{BOT_MARKER}"
         print("🚀 Posting failure comment to PR...")
         return self._safe_request("POST", url, headers=self.api_headers, json={"body": body})
 
