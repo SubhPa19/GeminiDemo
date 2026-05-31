@@ -612,40 +612,27 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
    Follow this action items section immediately with a divider line (only if critical/warnings > 0):
    ---
 
-3. **Checklist Accordions (DoD)**:
-   Present the Definition of Done (DoD) compliance checklist inside a main collapsible `<details open>` accordion (open by default). To establish proper typography hierarchy and prevent line breaks/arrow splitting, wrap the main title `🔍 DoD Checklist Compliance` inside `<summary><b><font size="5">...</font></b></summary>` to make it render in inline H2 font size with the arrow toggle directly next to it on the same line.
-   
-   **STRICT NO-SQUEEZE/NO-WRAP RULE**:
-   To prevent Category column squeezing and ugly word wrapping in GitHub markdown tables on mobile or desktop viewports, you MUST wrap every single Category name inside a `<nobr>` tag in the table rows (e.g. `| <nobr>Memory & Lifecycle</nobr> |` or `| <nobr>Performance</nobr> |`).
-   
-   **STRICT EMPTY TABLE EXCLUSION RULE**:
-   Under the main '<details open>' checklist compliance container:
-   - If there are no failed checks, you MUST completely omit the '### 🔴 Failed Checks (DoD)' section and its table. Do not show empty tables with no rows.
-   - If there are no warnings, you MUST completely omit the '<details open>' sub-accordion for '🟡 Warnings (DoD)' and its table. Do not show empty tables with no rows.
-   
-   **STRICT DOD HIDE RULE FOR PERFECT PRs**:
-   If there are **0 critical stability/security issues** and **0 warnings** (meaning all DoD checks passed successfully and the verdict is `🟢 LGTM`), you MUST **completely omit the entire '🔍 DoD Checklist Compliance' section** (including the `<details>`, `<summary>` accordion, the headers, and the tables). Do not output the checklist compliance accordion, Passed Checks table, or any down arrows. The report should end immediately after the top alert block's divider line (`---`).
-   
-   Ensure you output EXACTLY the following structure inside the `<details open>` tag, dynamically hiding the empty sections based on the rules above:
-   
-   <details open>
-   <summary><b><font size="5">🔍 DoD Checklist Compliance</font></b></summary>
-   <br>
-   
-   [### 🔴 Failed Checks (DoD) and table - ONLY if failed checks exist]
-   
-   [<details open> ... 🟡 Warnings (DoD) and table ... </details> - ONLY if warnings exist]
-   
-   <details>
-   <summary><b><font size="4">✅ Passed Checks (DoD)</font></b></summary>
-   
-   | <nobr>Category&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</nobr> | Requirement | Details |
-   | :--- | :--- | :--- |
-   | <nobr>[Category]</nobr> | [Requirement Description] | [Brief notes e.g. 'Meets standards'] |
-   
-   </details>
-   
-   </details>
+3. **DoD Checklist Compliance (Table-Free & Accordion-Free)**:
+    Present the Definition of Done (DoD) compliance checklist as a clean, flat list under '### 🔍 DoD Checklist Compliance'.
+    
+    **STRICT NO-TABLE/NO-ACCORDION RULE**:
+    You MUST NOT use HTML tables, markdown tables, `<details>`, `<summary>`, or `<nobr>` tags anywhere in this section. The checklist MUST be rendered as flat list text and inline backticked badges.
+    
+    **STRICT EMPTY ITEM EXCLUSION RULE**:
+    - If there are no failed checks, you MUST completely omit any '🔴 FAILED' bullet points.
+    - If there are no warnings, you MUST completely omit any '🟡 WARNING' bullet points.
+    
+    **STRICT DOD HIDE RULE FOR PERFECT PRs**:
+    If there are **0 critical stability/security issues** and **0 warnings** (meaning all DoD checks passed successfully and the verdict is `🟢 LGTM`), you MUST **completely omit the entire '### 🔍 DoD Checklist Compliance' section** (including the heading, its contents, and the badges). The report should end immediately after the top alert block's divider line (`---`).
+    
+    Ensure you output EXACTLY the following structure under the header, dynamically hiding the empty parts based on the rules above:
+    
+    ### 🔍 DoD Checklist Compliance
+    
+    * 🔴 **FAILED** | **[Category Name]** | *[Requirement Description]* — [Finding Details]
+    * 🟡 **WARNING** | **[Category Name]** | *[Requirement Description]* — [Finding Details]
+    
+    * 🟢 **PASSED ([Count]):** `[Passed Req 1]` • `[Passed Req 2]` • `[Passed Req 3]` • ...
 
 ---
 
