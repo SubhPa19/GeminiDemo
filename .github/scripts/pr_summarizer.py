@@ -286,6 +286,133 @@ class DiffParser:
         return valid_lines
 
 # ==============================================================================
+# 4.1 UNIVERSAL CONTEXT GRABBER (Single Responsibility Principle - Workspace Scanning)
+# ==============================================================================
+class UniversalContextGrabber:
+    """
+    100% Language-Agnostic Codebase Context & Type Resolution Grabber.
+    Extracts modified symbols from Git diffs, greps the workspace, 
+    and generates a raw symbol concordance map for the LLM.
+    """
+
+    # Universal programming keywords to filter out of diff symbols
+    UNIVERSAL_KEYWORDS = {
+        "if", "else", "switch", "case", "return", "true", "false", "this", "static", "const",
+        "val", "var", "fun", "let", "func", "class", "struct", "import", "package", "private",
+        "public", "protected", "override", "nil", "null", "void", "def", "fn", "function", "interface",
+        "int", "bool", "string", "float", "double", "for", "while", "break", "continue", "and", "or", "not"
+    }
+
+    @classmethod
+    def harvest_symbols(cls, diff_text: str) -> Set[str]:
+        """
+        Extracts all standard alphanumeric identifiers from the diff's modified lines.
+        """
+        symbols = set()
+        for line in diff_text.splitlines():
+            # Target only lines added or modified in the PR
+            if line.startswith("+") and not line.startswith("+++"):
+                # Match any word starting with a letter or underscore
+                words = re.findall(r'\b[a-zA-Z_]\w*\b', line)
+                symbols.update(words)
+        
+        # Filter out numbers, keywords, and short strings
+        return {s for s in symbols if s.lower() not in cls.UNIVERSAL_KEYWORDS and len(s) > 1 and not s.isdigit()}
+
+    @classmethod
+    def grep_symbol_definitions(cls, filepath: str, symbols: Set[str]) -> Dict[str, List[str]]:
+        """
+        Scans a file to find lines that look like definitions/initializations of symbols.
+        """
+        results = {}
+        if not os.path.exists(filepath) or os.path.isdir(filepath):
+            return results
+
+        try:
+            with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+                for line_idx, line in enumerate(f, 1):
+                    line_str = line.strip()
+                    # Skip empty lines or standard comments
+                    if not line_str or line_str.startswith("//") or line_str.startswith("#") or line_str.startswith("/*") or line_str.startswith("*"):
+                        continue
+                    
+                    for sym in symbols:
+                        # Match the symbol as a whole word boundary
+                        if re.search(r'\b' + re.escape(sym) + r'\b', line_str):
+                            # Focus on potential declarations: contains '=', 'class', 'struct', 'fun', 'def', type keyword, etc.
+                            if any(x in line_str for x in ["=", ":", "class", "struct", "void", "fn", "fun", "def", "func", "var", "let", "const"]):
+                                if sym not in results:
+                                    results[sym] = []
+                                results[sym].append(f"Line {line_idx}: {line_str}")
+        except Exception as e:
+            print(f"⚠️ Error scanning file {filepath}: {e}")
+        return results
+
+    @classmethod
+    def resolve_context(cls, diff_text: str, workspace_root: str = ".") -> str:
+        """
+        Entry point to harvest symbols and grep the workspace for matching declaration contexts.
+        """
+        symbols = cls.harvest_symbols(diff_text)
+        if not symbols:
+            return ""
+
+        # Parse valid files from the diff to scan
+        valid_files = set()
+        for line in diff_text.splitlines():
+            if line.startswith("+++ "):
+                filepath = line[4:].strip()
+                if filepath.startswith("b/"):
+                    filepath = filepath[2:]
+                filepath = filepath.lstrip('./').lstrip('/')
+                valid_files.add(filepath)
+
+        concordance_map = {}
+        for filepath in valid_files:
+            full_path = os.path.join(workspace_root, filepath)
+            file_results = cls.grep_symbol_definitions(full_path, symbols)
+            
+            for sym, lines in file_results.items():
+                if sym not in concordance_map:
+                    concordance_map[sym] = []
+                for l in lines:
+                    concordance_map[sym].append(f"In `{filepath}` -> {l}")
+
+            # For C/C++ projects, check candidate header files for the same symbols
+            _, ext = os.path.splitext(filepath)
+            if ext in (".cpp", ".cc", ".c"):
+                header_candidates = [
+                    filepath.replace(ext, ".hpp"),
+                    filepath.replace(ext, ".h"),
+                    filepath.replace("src/", "include/").replace(ext, ".hpp"),
+                    filepath.replace("src/", "include/").replace(ext, ".h")
+                ]
+                for hp in header_candidates:
+                    full_hp = os.path.join(workspace_root, hp)
+                    for sym, lines in cls.grep_symbol_definitions(full_hp, symbols).items():
+                        if sym not in concordance_map:
+                            concordance_map[sym] = []
+                        for l in lines:
+                            concordance_map[sym].append(f"In `{hp}` -> {l}")
+
+        if not concordance_map:
+            return ""
+
+        # Format Concordance Map as a clean Markdown block for the LLM
+        markdown_lines = [
+            "\n### 🔍 CODEBASE DEFINITIONS & SYMBOL CONCORDANCE MAP:",
+            "Here are the raw declaration/initialization lines resolved from your local workspace files for modified variables in this diff:",
+        ]
+        for symbol, occurrences in concordance_map.items():
+            markdown_lines.append(f"\n- Symbol `{symbol}`:")
+            for occ in occurrences:
+                markdown_lines.append(f"  * {occ}")
+                
+        markdown_lines.append("\n*Use this raw codebase context to identify the programming language, variable types, class architectures, and safety parameters dynamically.*")
+        
+        return "\n".join(markdown_lines)
+
+# ==============================================================================
 # 5. METRICS EXPORTER CLIENT (Single Responsibility Principle - Telemetry Webhook)
 # ==============================================================================
 class MetricsExporter:
@@ -352,6 +479,23 @@ class PRReviewOrchestrator:
         default_checklist = config.get("default_checklist", "General best practices applied.")
         hunter_prompt_extra = config.get("hunter_prompt_extra", "Analyze this Git Diff for bugs.")
         verifier_risks_prompt = config.get("verifier_risks_prompt", "Highlight potential risks.")
+        
+        # 100% Generic Fallback Grounding Rules
+        default_grounding = """Before writing any verified finding to the output JSON, you MUST run each candidate finding through this strict self-correction pass:
+
+1. **The Scope Check:**
+   - *Is the candidate issue referencing a line number that was NOT added or modified in the diff (lines starting with '+')?*
+   - *If YES:* You MUST delete/reject this finding entirely. You are strictly forbidden from reporting issues on unchanged context lines.
+
+2. **The Certainty Check:**
+   - *Are you 100% certain of the variable types, API interfaces, or framework behaviors based on the provided diff and codebase context?*
+   - *If NO (i.e. you are guessing or assuming a type without explicit codebase declarations):* Do NOT flag this as a critical bug or logical failure. Demote it to a minor suggestion or delete it entirely.
+
+3. **The Styling & Convention Check:**
+   - *Is the candidate issue a minor code-styling preference (e.g. indentation, bracket placement, variable naming styles) rather than a safety, stability, or logic bug?*
+   - *If YES:* Do not block the merge. Demote it to a minor warning or delete it entirely."""
+
+        verifier_grounding_rules = config.get("verifier_grounding_rules", default_grounding)
 
         pr_summary_title = "PR Analysis"
         
@@ -370,6 +514,21 @@ class PRReviewOrchestrator:
 
             # Retrieve checklist template
             checklist = self.gh.fetch_checklist(meta['base_branch'], self.checklist_path) or default_checklist
+
+            # Retrieve architectural constraints
+            constraints_path = os.getenv("CONSTRAINTS_PATH", ".github/architectural_constraints.md")
+            constraints = ""
+            try:
+                if os.path.exists(constraints_path):
+                    print("📖 Loading architectural constraints locally...")
+                    with open(constraints_path, "r", encoding="utf-8") as f:
+                        constraints = f.read()
+            except Exception as e:
+                print(f"⚠️ Failed to read local constraints: {e}")
+
+            if not constraints:
+                print("🌐 Fetching architectural constraints from base branch...")
+                constraints = self.gh.fetch_checklist(meta['base_branch'], constraints_path) or ""
 
             # 3. Concurrency Stage: Run Summary and Hunter passes in parallel
             print(f"🚀 Starting {domain_name} Parallel Analysis passes...")
@@ -399,8 +558,17 @@ class PRReviewOrchestrator:
 
             # 4. Verifier Pass: Synthesize Hunter Findings and the Code
             print(f"🛡️ Starting {domain_name} verification pass...")
+            codebase_context = UniversalContextGrabber.resolve_context(diff, workspace_root=".")
             verifier_prompt = f"""
 You are the {persona}. Verify findings and generate a dual JSON report.
+
+### 🏗️ PROJECT-WIDE ARCHITECTURAL & CODING CONSTRAINTS:
+{constraints}
+
+{codebase_context}
+
+### 🛡️ STRICT SELF-CORRECTION & GROUNDING RULES (DO THIS FIRST):
+{verifier_grounding_rules}
 
 ### **STRICT JSON REQUIREMENTS**:
 - Output MUST be valid JSON. 
