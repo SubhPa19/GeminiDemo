@@ -597,23 +597,19 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
    Structure inside the block (exact markdown):
    > [!CAUTION] (or !WARNING / !NOTE)
    > ### [Verdict Emoji] **Merge Verdict: [Verdict Status]**
-   > [1-sentence justification with bolded metrics, e.g.: This PR introduces **6 critical stability/security issues** and **2 warnings**...]
-   > 
-   > **Summary:** {pr_summary_text}
-   
-   Follow this top alert block immediately with a divider line:
-   ---
-
-2. **Action Items Punch List**:
+   > [1-sentence justification with bolded metrics, e.g.: This PR introduces **6 critical stability/security issues** and **2 warnings2. **Action Items Punch List**:
    Present all critical issues and warnings as a highly compact, single-line bulleted list under '## 📋 Action Items'. Do not use blockquotes, card boxes, or expandable details blocks for this section. Maintain a clean, flat list where each line contains the severity emoji/label, file link with line anchor, and a very short description.
    
-   Structure inside the list:
+   **STRICT EMPTY SECTION EXCLUSION RULE**:
+   If there are **0 critical stability/security issues** and **0 warnings**, you MUST completely omit the '## 📋 Action Items' section and its following divider line (`---`). Do not print the header or any bullet points.
+   
+   Structure inside the list (only output if critical/warnings > 0):
    ## 📋 Action Items
    
    * 🔴 **Critical** | [[File Name]:[Line Number]]([Relative File Path]#L[Line Number]) — **[Issue Category Name]**: [Short, punchy description of the issue]
    * 🟡 **Warning** | [[File Name]:[Line Number]]([Relative File Path]#L[Line Number]) — **[Issue Category Name]**: [Short, punchy description of the issue]
    
-   Follow this action items section immediately with a divider line:
+   Follow this action items section immediately with a divider line (only if critical/warnings > 0):
    ---
 
 3. **Checklist Accordions (DoD)**:
@@ -622,35 +618,29 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
    **STRICT NO-SQUEEZE/NO-WRAP RULE**:
    To prevent Category column squeezing and ugly word wrapping in GitHub markdown tables on mobile or desktop viewports, you MUST wrap every single Category name inside a `<nobr>` tag in the table rows (e.g. `| <nobr>Memory & Lifecycle</nobr> |` or `| <nobr>Performance</nobr> |`).
    
-   Ensure you output EXACTLY the following structure inside the `<details open>` tag (do NOT output any instruction bullet points or introductory list items like '- Failed Checks' or '- Warnings'):
+   **STRICT EMPTY TABLE EXCLUSION RULE**:
+   Under the main '<details open>' checklist compliance container:
+   - If there are no failed checks, you MUST completely omit the '### 🔴 Failed Checks (DoD)' section and its table. Do not show empty tables with no rows.
+   - If there are no warnings, you MUST completely omit the '<details open>' sub-accordion for '🟡 Warnings (DoD)' and its table. Do not show empty tables with no rows.
+   
+   Ensure you output EXACTLY the following structure inside the `<details open>` tag, dynamically hiding the empty sections based on the rules above:
    
    <details open>
    <summary><b><font size="5">🔍 DoD Checklist Compliance</font></b></summary>
    <br>
    
-   ### 🔴 Failed Checks (DoD)
+   [### 🔴 Failed Checks (DoD) and table - ONLY if failed checks exist]
+   
+   [<details open> ... 🟡 Warnings (DoD) and table ... </details> - ONLY if warnings exist]
+   
+   <details>
+   <summary><b><font size="4">✅ Passed Checks (DoD)</font></b></summary>
    
    | <nobr>Category&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</nobr> | Requirement | Details |
    | :--- | :--- | :--- |
-   | <nobr>[Category]</nobr> | [Requirement Description] | [Failure Details] |
+   | <nobr>[Category]</nobr> | [Requirement Description] | [Brief notes e.g. 'Meets standards'] |
    
-    <details open>
-    <summary><b><font size="4">🟡 Warnings (DoD)</font></b></summary>
-    
-    | <nobr>Category&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</nobr> | Requirement | Details |
-    | :--- | :--- | :--- |
-    | <nobr>[Category]</nobr> | [Requirement Description] | [Warning Details] |
-    
-    </details>
-    
-    <details>
-    <summary><b><font size="4">✅ Passed Checks (DoD)</font></b></summary>
-    
-    | <nobr>Category&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</nobr> | Requirement | Details |
-    | :--- | :--- | :--- |
-    | <nobr>[Category]</nobr> | [Requirement Description] | [Brief notes e.g. 'Meets standards'] |
-    
-    </details>
+   </details>
    
    </details>
 
