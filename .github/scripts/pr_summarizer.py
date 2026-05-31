@@ -5,7 +5,7 @@ import sys
 import time
 import re
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Optional, Dict, Set
+from typing import Any, Optional, Dict, Set, List
 
 # ==============================================================================
 # SCRIPT METADATA & CONSTANTS
