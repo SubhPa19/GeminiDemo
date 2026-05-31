@@ -623,6 +623,9 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
    - If there are no failed checks, you MUST completely omit the '### 🔴 Failed Checks (DoD)' section and its table. Do not show empty tables with no rows.
    - If there are no warnings, you MUST completely omit the '<details open>' sub-accordion for '🟡 Warnings (DoD)' and its table. Do not show empty tables with no rows.
    
+   **STRICT DOD HIDE RULE FOR PERFECT PRs**:
+   If there are **0 critical stability/security issues** and **0 warnings** (meaning all DoD checks passed successfully and the verdict is `🟢 LGTM`), you MUST **completely omit the entire '🔍 DoD Checklist Compliance' section** (including the `<details>`, `<summary>` accordion, the headers, and the tables). Do not output the checklist compliance accordion, Passed Checks table, or any down arrows. The report should end immediately after the top alert block's divider line (`---`).
+   
    Ensure you output EXACTLY the following structure inside the `<details open>` tag, dynamically hiding the empty sections based on the rules above:
    
    <details open>
