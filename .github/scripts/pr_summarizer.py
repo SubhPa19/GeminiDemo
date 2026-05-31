@@ -604,10 +604,10 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
    If there are **0 critical stability/security issues** and **0 warnings**, you MUST completely omit the '## 📋 Action Items' section and its following divider line (`---`). Do not print the header or any bullet points.
    
    Structure inside the list (only output if critical/warnings > 0):
-   ## 📋 Action Items
-   
-   * 🔴 **Critical** | [[File Name]:[Line Number]]([Relative File Path]#L[Line Number]) — **[Issue Category Name]**: [Short, punchy description of the issue]
-   * 🟡 **Warning** | [[File Name]:[Line Number]]([Relative File Path]#L[Line Number]) — **[Issue Category Name]**: [Short, punchy description of the issue]
+    ## 📋 Action Items
+    
+    * 🔴 **Critical** | [File Name:Line Number](Relative_File_Path#LLine_Number) — **[Issue Category Name]**: [Short, punchy description of the issue]
+    * 🟡 **Warning** | [File Name:Line Number](Relative_File_Path#LLine_Number) — **[Issue Category Name]**: [Short, punchy description of the issue]
    
    Follow this action items section immediately with a divider line (only if critical/warnings > 0):
    ---
