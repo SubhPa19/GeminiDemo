@@ -597,7 +597,9 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
    Structure inside the block (exact markdown):
    > [!CAUTION] (or !WARNING / !NOTE)
    > ### [Verdict Emoji] **Merge Verdict: [Verdict Status]**
-   > [1-sentence justification with bolded metrics, e.g.: This PR introduces **6 critical stability/security issues** and **2 warnings2. **Action Items Punch List**:
+   > [1-sentence justification with bolded metrics, e.g.: This PR introduces **6 critical stability/security issues** and **2 warnings**.
+   
+2. **Action Items Punch List**:
    Present all critical issues and warnings as a highly compact, single-line bulleted list under '## 📋 Action Items'. Do not use blockquotes, card boxes, or expandable details blocks for this section. Maintain a clean, flat list where each line contains the severity emoji/label, file link with line anchor, and a very short description.
    
    **STRICT EMPTY SECTION EXCLUSION RULE**:
@@ -608,10 +610,10 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
     
     * 🔴 **Critical** | [File Name:Line Number](Relative_File_Path#LLine_Number) — **[Issue Category Name]**: [Short, punchy description of the issue]
     * 🟡 **Warning** | [File Name:Line Number](Relative_File_Path#LLine_Number) — **[Issue Category Name]**: [Short, punchy description of the issue]
-   
-   Follow this action items section immediately with a divider line (only if critical/warnings > 0):
-   ---
-
+    
+    Follow this action items section immediately with a divider line (only if critical/warnings > 0):
+    ---
+ 
 3. **DoD Checklist Compliance (Table-Free & Accordion-Free)**:
     Present the Definition of Done (DoD) compliance checklist as a clean, flat list under '### 🔍 DoD Checklist Compliance'.
     
@@ -625,6 +627,9 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
     **STRICT DOD HIDE RULE FOR PERFECT PRs**:
     If there are **0 critical stability/security issues** and **0 warnings** (meaning all DoD checks passed successfully and the verdict is `🟢 LGTM`), you MUST **completely omit the entire '### 🔍 DoD Checklist Compliance' section** (including the heading, its contents, and the badges). The report should end immediately after the top alert block's divider line (`---`).
     
+    **STRICT PASSED CHECKS CATEGORY AGGREGATION RULE**:
+    To eliminate text clutter and keep comments compact, you MUST NOT list every individual passed requirement by name. Instead, you MUST group all passed requirements by their Category Name and display them as a list of category badges with counts of passed checks in that category.
+    
     Ensure you output EXACTLY the following structure under the header, dynamically hiding the empty parts based on the rules above:
     
     ### 🔍 DoD Checklist Compliance
@@ -632,7 +637,7 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
     * 🔴 **FAILED** | **[Category Name]** | *[Requirement Description]* — [Finding Details]
     * 🟡 **WARNING** | **[Category Name]** | *[Requirement Description]* — [Finding Details]
     
-    * 🟢 **PASSED ([Count]):** `[Passed Req 1]` • `[Passed Req 2]` • `[Passed Req 3]` • ...
+    * 🟢 **PASSED ([Total Count] Checks):** `[Category 1 Name] ([Passed Count 1])` • `[Category 2 Name] ([Passed Count 2])` • `[Category 3 Name] ([Passed Count 3])` • ...
 
 ---
 
