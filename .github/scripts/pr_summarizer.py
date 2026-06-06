@@ -384,6 +384,11 @@ class UniversalContextGrabber:
                 if filepath != "dev/null":
                     valid_files.add(filepath)
 
+        # SAFETY VALVE: Skip full file context for massive PRs to maintain LLM focus
+        if len(valid_files) > 50:
+            print(f"⚠️ Massive PR detected ({len(valid_files)} files). Skipping Full File Context to preserve LLM focus; relying on Diff + AST only.")
+            return ""
+
         file_contents = []
         for filepath in valid_files:
             full_path = os.path.join(workspace_root, filepath)
