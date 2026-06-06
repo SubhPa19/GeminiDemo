@@ -25,7 +25,7 @@ from typing import Any, Optional, Dict, Set, List
 # ==============================================================================
 # SCRIPT METADATA & CONSTANTS
 # ==============================================================================
-SCRIPT_VERSION = "2.3.2"
+SCRIPT_VERSION = "2.3.3"
 BOT_MARKER = f"<!-- gemini-bot-review-v{SCRIPT_VERSION} -->"
 
 # ==============================================================================
@@ -632,9 +632,9 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
    Structure inside the list (only output if issues > 0):
     ### 🛠️ Action Required
     
-    * 🔴 **Critical** | [File Name:Line Number](Relative_File_Path#LLine_Number) — **[Issue Category Name]**: [Short description]
-    * 🟠 **Major** | [File Name:Line Number](Relative_File_Path#LLine_Number) — **[Issue Category Name]**: [Short description]
-    * 🟡 **Minor/Warning** | [File Name:Line Number](Relative_File_Path#LLine_Number) — **[Issue Category Name]**: [Short description]
+    * 🔴 **Critical** | [File Name:Line Number](../blob/{meta['head_sha']}/Relative_File_Path#L<Line_Number>) — **[Issue Category Name]**: [Short description]
+    * 🟠 **Major** | [File Name:Line Number](../blob/{meta['head_sha']}/Relative_File_Path#L<Line_Number>) — **[Issue Category Name]**: [Short description]
+    * 🟡 **Minor/Warning** | [File Name:Line Number](../blob/{meta['head_sha']}/Relative_File_Path#L<Line_Number>) — **[Issue Category Name]**: [Short description]
     
     Follow this action items section immediately with a divider line (only if issues > 0):
     ---
