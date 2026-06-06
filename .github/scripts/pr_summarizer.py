@@ -588,7 +588,7 @@ You are the {persona}. Verify findings and generate a dual JSON report.
 **REQUIRED OUTPUT JSON KEYS**:
 1. "scratchpad": A string containing your step-by-step logical reasoning before generating the final verdict. Explicitly trace the execution flow of modified functions. Map out what happens if multiple threads hit this code simultaneously.
 2. "markdown_report": Full Markdown report text formatted EXACTLY as described below.
-3. "verified_findings": JSON logic array [{"path": "path", "line": 123, "severity": "critical|minor", "critique": "text", "surgical_fix": "code"}]
+3. "verified_findings": JSON logic array [{{"path": "path", "line": 123, "severity": "critical|minor", "critique": "text", "surgical_fix": "code"}}]
 4. "merge_verdict": 🟢 LGTM, 🟡 Needs Review, or 🔴 HARD STOP.
 
 ### 📋 Formatting Guide for "markdown_report":
