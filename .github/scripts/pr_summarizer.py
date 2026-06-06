@@ -25,7 +25,7 @@ from typing import Any, Optional, Dict, Set, List
 # ==============================================================================
 # SCRIPT METADATA & CONSTANTS
 # ==============================================================================
-SCRIPT_VERSION = "2.4.4"
+SCRIPT_VERSION = "2.4.5"
 BOT_MARKER = f"<!-- gemini-bot-review-v{SCRIPT_VERSION} -->"
 
 # ==============================================================================
@@ -635,10 +635,7 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
     * 🔴 **Critical** | [File Name:Line Number](../blob/{meta['head_sha']}/Relative_File_Path#L<Line_Number>) — **[Issue Category Name]**: [Short description]
     * 🟠 **Major** | [File Name:Line Number](../blob/{meta['head_sha']}/Relative_File_Path#L<Line_Number>) — **[Issue Category Name]**: [Short description]
     * 🟡 **Minor/Warning** | [File Name:Line Number](../blob/{meta['head_sha']}/Relative_File_Path#L<Line_Number>) — **[Issue Category Name]**: [Short description]
-    
-    Follow this action items section with a divider line (only if issues > 0), ensuring there is an empty line before the divider:
-    
-    ---
+    Follow this action items section with extra whitespace to create a visual break (only if issues > 0). Do NOT use a markdown divider line (`---`). Use `<br>` or empty lines instead.
 
 3. **Definition of Done (DoD) Compliance (Table-Free & Accordion-Free)**:
     Present the Definition of Done (DoD) compliance checklist as a clean, flat list under '### 🛡️ Definition of Done (DoD)'.
