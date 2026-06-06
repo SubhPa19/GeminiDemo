@@ -375,6 +375,43 @@ class UniversalContextGrabber:
         
         return "\n".join(markdown_lines)
 
+    @classmethod
+    def resolve_full_files_context(cls, diff_text: str, workspace_root: str = ".") -> str:
+        valid_files = set()
+        for line in diff_text.splitlines():
+            if line.startswith("+++ "):
+                filepath = line[4:].strip().lstrip('b/').lstrip('./').lstrip('/')
+                if filepath != "dev/null":
+                    valid_files.add(filepath)
+
+        file_contents = []
+        for filepath in valid_files:
+            full_path = os.path.join(workspace_root, filepath)
+            if not os.path.exists(full_path): continue
+            
+            try:
+                with open(full_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                file_contents.append(f"### File: {filepath}\n```\n{content}\n```")
+            except Exception as e:
+                print(f"⚠️ Failed to read full file context for {filepath}: {e}")
+
+        if not file_contents:
+            return ""
+
+        markdown_lines = [
+            "\n### 📄 FULL MODIFIED FILE CONTENTS:",
+            "Below are the complete contents of all files modified in this PR. Use these to understand logic and state outside the immediate 3-line diff window:"
+        ]
+        markdown_lines.extend(file_contents)
+        
+        full_text = "\n\n".join(markdown_lines)
+        if len(full_text) > 400000:
+            print("⚠️ Full file context too large, truncating...")
+            full_text = full_text[:400000] + "\n\n[Full file context truncated for size]"
+            
+        return full_text
+
 # ==============================================================================
 # 5. METRICS EXPORTER CLIENT (Single Responsibility Principle - Telemetry Webhook)
 # ==============================================================================
@@ -495,6 +532,7 @@ class PRReviewOrchestrator:
 
             # 3. Concurrency Stage: Run Summary and Hunter passes in parallel
             print(f"🚀 Starting {domain_name} Parallel Analysis passes...")
+            full_file_context = UniversalContextGrabber.resolve_full_files_context(diff, workspace_root=".")
             with ThreadPoolExecutor(max_workers=2) as executor:
                 summary_prompt = (
                     f"Summarize in one short sentence what this PR titled '{meta['title']}' "
@@ -503,7 +541,7 @@ class PRReviewOrchestrator:
                 )
                 summary_future = executor.submit(self.llm.get_completion, summary_prompt)
                 
-                hunter_prompt = f"{hunter_prompt_extra} Output a JSON array of objects with 'path', 'line', and 'finding'.\n\n{diff}"
+                hunter_prompt = f"{hunter_prompt_extra} Output a JSON array of objects with 'path', 'line', and 'finding'.\n\n{diff}\n{full_file_context}"
                 hunter_future = executor.submit(self.llm.get_completion, hunter_prompt, is_json=True)
 
                 pr_summary_text = summary_future.result() or meta['title']
@@ -529,6 +567,8 @@ You are the {persona}. Verify findings and generate a dual JSON report.
 {constraints}
 
 {codebase_context}
+
+{full_file_context}
 
 ### 🛡️ STRICT SELF-CORRECTION & GROUNDING RULES (DO THIS FIRST):
 {verifier_grounding_rules}
