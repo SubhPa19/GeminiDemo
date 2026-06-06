@@ -29,7 +29,7 @@ from typing import Any, Optional, Dict, Set, List
 # ==============================================================================
 # SCRIPT METADATA & CONSTANTS
 # ==============================================================================
-SCRIPT_VERSION = "2.4.13"
+SCRIPT_VERSION = "2.4.14"
 BOT_MARKER = f"<!-- gemini-bot-review-v{SCRIPT_VERSION} -->"
 
 # ==============================================================================
@@ -164,6 +164,7 @@ class GitHubClient:
         """
         Generic request wrapper with optimized 429 (Rate Limit) and 422 handling.
         """
+        kwargs.setdefault("timeout", 30)
         for attempt in range(5):
             try:
                 res = requests.request(method, url, **kwargs)
