@@ -1,7 +1,19 @@
 import os
+import sys
+import subprocess
+
+# --- Dynamic Dependency Bootstrapping ---
+REQUIRED_PACKAGES = ["requests", "tree-sitter-languages"]
+for package in REQUIRED_PACKAGES:
+    import_name = package.replace("-", "_")
+    try:
+        __import__(import_name)
+    except ImportError:
+        print(f"📦 Installing missing dependency: {package}...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+
 import json
 import requests
-import sys
 import time
 import re
 from concurrent.futures import ThreadPoolExecutor
@@ -10,7 +22,7 @@ from typing import Any, Optional, Dict, Set, List
 # ==============================================================================
 # SCRIPT METADATA & CONSTANTS
 # ==============================================================================
-SCRIPT_VERSION = "2.0.0"
+SCRIPT_VERSION = "2.1.0"
 BOT_MARKER = f"<!-- gemini-bot-review-v{SCRIPT_VERSION} -->"
 
 # ==============================================================================
@@ -290,125 +302,73 @@ class DiffParser:
 # ==============================================================================
 class UniversalContextGrabber:
     """
-    100% Language-Agnostic Codebase Context & Type Resolution Grabber.
-    Extracts modified symbols from Git diffs, greps the workspace, 
-    and generates a raw symbol concordance map for the LLM.
+    AST-based Codebase Context & Type Resolution Grabber using tree-sitter-languages.
     """
-
-    # Universal programming keywords to filter out of diff symbols
-    UNIVERSAL_KEYWORDS = {
-        "if", "else", "switch", "case", "return", "true", "false", "this", "static", "const",
-        "val", "var", "fun", "let", "func", "class", "struct", "import", "package", "private",
-        "public", "protected", "override", "nil", "null", "void", "def", "fn", "function", "interface",
-        "int", "bool", "string", "float", "double", "for", "while", "break", "continue", "and", "or", "not"
+    EXT_TO_LANG = {
+        ".c": "c", ".h": "c", ".cpp": "cpp", ".cc": "cpp", ".hpp": "cpp",
+        ".java": "java", ".kt": "kotlin", ".kts": "kotlin",
+        ".cs": "c_sharp", ".py": "python", ".sh": "bash", ".bash": "bash",
+        ".js": "javascript", ".ts": "typescript", ".tsx": "tsx",
+        ".swift": "swift", ".go": "go", ".rb": "ruby"
     }
 
     @classmethod
-    def harvest_symbols(cls, diff_text: str) -> Set[str]:
-        """
-        Extracts all standard alphanumeric identifiers from the diff's modified lines.
-        """
-        symbols = set()
-        for line in diff_text.splitlines():
-            # Target only lines added or modified in the PR
-            if line.startswith("+") and not line.startswith("+++"):
-                # Match any word starting with a letter or underscore
-                words = re.findall(r'\b[a-zA-Z_]\w*\b', line)
-                symbols.update(words)
+    def extract_ast_context(cls, filepath: str) -> str:
+        if not os.path.exists(filepath): return ""
+        _, ext = os.path.splitext(filepath)
+        lang = cls.EXT_TO_LANG.get(ext)
+        if not lang: return ""
         
-        # Filter out numbers, keywords, and short strings
-        return {s for s in symbols if s.lower() not in cls.UNIVERSAL_KEYWORDS and len(s) > 1 and not s.isdigit()}
-
-    @classmethod
-    def grep_symbol_definitions(cls, filepath: str, symbols: Set[str]) -> Dict[str, List[str]]:
-        """
-        Scans a file to find lines that look like definitions/initializations of symbols.
-        """
-        results = {}
-        if not os.path.exists(filepath) or os.path.isdir(filepath):
-            return results
-
         try:
-            with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
-                for line_idx, line in enumerate(f, 1):
-                    line_str = line.strip()
-                    # Skip empty lines or standard comments
-                    if not line_str or line_str.startswith("//") or line_str.startswith("#") or line_str.startswith("/*") or line_str.startswith("*"):
-                        continue
+            from tree_sitter_languages import get_parser
+            parser = get_parser(lang)
+            with open(filepath, "r", encoding="utf-8") as f:
+                code_bytes = f.read().encode("utf-8")
+            
+            tree = parser.parse(code_bytes)
+            
+            context_lines = []
+            def traverse(node):
+                if node.type in ['class_declaration', 'function_declaration', 'method_declaration', 'struct_specifier', 'interface_declaration', 'function_definition']:
+                    start_byte = node.start_byte
+                    # Extract the signature (limit to 200 chars to avoid grabbing huge blocks)
+                    code_snippet = code_bytes[start_byte:start_byte+200].decode('utf-8', errors='ignore')
+                    signature = code_snippet.split('{')[0].split('\n')[0].strip()
+                    if signature:
+                        context_lines.append(f"  * Declared in `{os.path.basename(filepath)}`: {signature}")
+                for child in node.children:
+                    traverse(child)
                     
-                    for sym in symbols:
-                        # Match the symbol as a whole word boundary
-                        if re.search(r'\b' + re.escape(sym) + r'\b', line_str):
-                            # Focus on potential declarations: contains '=', 'class', 'struct', 'fun', 'def', type keyword, etc.
-                            if any(x in line_str for x in ["=", ":", "class", "struct", "void", "fn", "fun", "def", "func", "var", "let", "const"]):
-                                if sym not in results:
-                                    results[sym] = []
-                                results[sym].append(f"Line {line_idx}: {line_str}")
+            traverse(tree.root_node)
+            return "\n".join(context_lines)
         except Exception as e:
-            print(f"⚠️ Error scanning file {filepath}: {e}")
-        return results
+            print(f"⚠️ AST extraction failed for {filepath}: {e}")
+            return ""
 
     @classmethod
     def resolve_context(cls, diff_text: str, workspace_root: str = ".") -> str:
-        """
-        Entry point to harvest symbols and grep the workspace for matching declaration contexts.
-        """
-        symbols = cls.harvest_symbols(diff_text)
-        if not symbols:
-            return ""
-
-        # Parse valid files from the diff to scan
         valid_files = set()
         for line in diff_text.splitlines():
             if line.startswith("+++ "):
-                filepath = line[4:].strip()
-                if filepath.startswith("b/"):
-                    filepath = filepath[2:]
-                filepath = filepath.lstrip('./').lstrip('/')
+                filepath = line[4:].strip().lstrip('b/').lstrip('./').lstrip('/')
                 valid_files.add(filepath)
 
-        concordance_map = {}
+        ast_results = []
         for filepath in valid_files:
             full_path = os.path.join(workspace_root, filepath)
-            file_results = cls.grep_symbol_definitions(full_path, symbols)
-            
-            for sym, lines in file_results.items():
-                if sym not in concordance_map:
-                    concordance_map[sym] = []
-                for l in lines:
-                    concordance_map[sym].append(f"In `{filepath}` -> {l}")
+            ctx = cls.extract_ast_context(full_path)
+            if ctx:
+                ast_results.append(ctx)
 
-            # For C/C++ projects, check candidate header files for the same symbols
-            _, ext = os.path.splitext(filepath)
-            if ext in (".cpp", ".cc", ".c"):
-                header_candidates = [
-                    filepath.replace(ext, ".hpp"),
-                    filepath.replace(ext, ".h"),
-                    filepath.replace("src/", "include/").replace(ext, ".hpp"),
-                    filepath.replace("src/", "include/").replace(ext, ".h")
-                ]
-                for hp in header_candidates:
-                    full_hp = os.path.join(workspace_root, hp)
-                    for sym, lines in cls.grep_symbol_definitions(full_hp, symbols).items():
-                        if sym not in concordance_map:
-                            concordance_map[sym] = []
-                        for l in lines:
-                            concordance_map[sym].append(f"In `{hp}` -> {l}")
-
-        if not concordance_map:
+        if not ast_results:
             return ""
 
-        # Format Concordance Map as a clean Markdown block for the LLM
         markdown_lines = [
-            "\n### 🔍 CODEBASE DEFINITIONS & SYMBOL CONCORDANCE MAP:",
-            "Here are the raw declaration/initialization lines resolved from your local workspace files for modified variables in this diff:",
+            "\n### 🔍 AST CODEBASE ARCHITECTURE CONTEXT:",
+            "Here are the structural signatures (classes/methods/interfaces) of the modified files extracted via Abstract Syntax Tree:"
         ]
-        for symbol, occurrences in concordance_map.items():
-            markdown_lines.append(f"\n- Symbol `{symbol}`:")
-            for occ in occurrences:
-                markdown_lines.append(f"  * {occ}")
-                
-        markdown_lines.append("\n*Use this raw codebase context to identify the programming language, variable types, class architectures, and safety parameters dynamically.*")
+        markdown_lines.extend(ast_results)
+        markdown_lines.append("\n*Use this precise structural context to identify the programming language, variable types, class architectures, and safety parameters dynamically.*")
         
         return "\n".join(markdown_lines)
 
