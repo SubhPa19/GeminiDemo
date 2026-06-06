@@ -13,7 +13,11 @@ except ImportError:
     import sys
     import subprocess
     print("📦 Bootstrapping specific versions of tree-sitter to avoid breaking API changes...")
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "requests", "tree-sitter==0.21.3", "tree-sitter-languages==1.10.2", "--break-system-packages"])
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "requests", "tree-sitter==0.21.3", "tree-sitter-languages==1.10.2", "--break-system-packages"])
+    except subprocess.CalledProcessError:
+        print("Fallback: Retrying install without --break-system-packages for older pip versions...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "requests", "tree-sitter==0.21.3", "tree-sitter-languages==1.10.2"])
 
 import json
 import requests
@@ -25,7 +29,7 @@ from typing import Any, Optional, Dict, Set, List
 # ==============================================================================
 # SCRIPT METADATA & CONSTANTS
 # ==============================================================================
-SCRIPT_VERSION = "2.4.12"
+SCRIPT_VERSION = "2.4.13"
 BOT_MARKER = f"<!-- gemini-bot-review-v{SCRIPT_VERSION} -->"
 
 # ==============================================================================
