@@ -3,13 +3,21 @@ import sys
 import subprocess
 
 # --- Dynamic Dependency Bootstrapping ---
-REQUIRED_PACKAGES = ["requests", "tree-sitter-languages"]
-for package in REQUIRED_PACKAGES:
-    import_name = package.replace("-", "_")
+REQUIRED_PACKAGES = [
+    ("requests", "requests"),
+    ("tree_sitter", "tree-sitter==0.21.3"),
+    ("tree_sitter_languages", "tree-sitter-languages")
+]
+for import_name, package in REQUIRED_PACKAGES:
     try:
-        __import__(import_name)
-    except ImportError:
-        print(f"📦 Installing missing dependency: {package}...")
+        if import_name == "tree_sitter":
+            import tree_sitter
+            if getattr(tree_sitter, "__version__", "") != "0.21.3":
+                raise ImportError("Version mismatch")
+        else:
+            __import__(import_name)
+    except (ImportError, AttributeError):
+        print(f"📦 Installing missing or mismatched dependency: {package}...")
         subprocess.check_call([sys.executable, "-m", "pip", "install", package])
 
 import json
