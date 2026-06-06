@@ -25,7 +25,7 @@ from typing import Any, Optional, Dict, Set, List
 # ==============================================================================
 # SCRIPT METADATA & CONSTANTS
 # ==============================================================================
-SCRIPT_VERSION = "2.4.2"
+SCRIPT_VERSION = "2.4.3"
 BOT_MARKER = f"<!-- gemini-bot-review-v{SCRIPT_VERSION} -->"
 
 # ==============================================================================
@@ -697,8 +697,8 @@ Checklist: {checklist}
                     if not isinstance(f, dict): 
                         continue
                     path, line = f.get('path'), f.get('line')
-                    critique = f.get('critique', 'No critique.')
-                    fix = f.get('surgical_fix', '// No fix.').strip()
+                    critique = str(f.get('critique') or 'No critique.')
+                    fix = str(f.get('surgical_fix') or '// No fix.').strip()
                     if fix.startswith('```') and fix.endswith('```'):
                         lines = fix.split('\n')
                         if len(lines) >= 2:
