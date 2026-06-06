@@ -811,6 +811,8 @@ Checklist: {checklist}
                 MetricsExporter.export_metrics(webhook_url, metrics_payload)
 
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             print(f"💥 Fatal error inside pipeline: {e}")
             self.gh.post_failure_comment(str(e))
             sys.exit(1)
