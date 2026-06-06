@@ -25,7 +25,7 @@ from typing import Any, Optional, Dict, Set, List
 # ==============================================================================
 # SCRIPT METADATA & CONSTANTS
 # ==============================================================================
-SCRIPT_VERSION = "2.4.10"
+SCRIPT_VERSION = "2.4.11"
 BOT_MARKER = f"<!-- gemini-bot-review-v{SCRIPT_VERSION} -->"
 
 # ==============================================================================
@@ -238,7 +238,7 @@ class GitHubClient:
         print(f"📦 Submitting bundled review ({len(comments)} inline findings) as {event}...")
         url = f"{self.base_url}/pulls/{self.pr_number}/reviews"
         payload = {
-            "body": body + f"\n\n<br>\n\n<sup>[**Grace-{SCRIPT_VERSION}**](https://docs.google.com/presentation/d/1mN6SBazQFwcmtuBgiGhm184HVhY_CvxWq9t4nZt6mzQ/edit?usp=sharing \"Gemini-powered Review And Code Evaluator\") | [Share Feedback](https://forms.gle/bpRX129ku5YMi9JLA) | [Walkthrough & Guide](https://drive.google.com/file/d/1paA9hswGG1MazQF_0WBvrZD9sKBUscOy/view?usp=drive_link)</sup>\n{BOT_MARKER}",
+            "body": body + f"\n\n<br><br>\n\n<sup>[**Grace-{SCRIPT_VERSION}**](https://docs.google.com/presentation/d/1mN6SBazQFwcmtuBgiGhm184HVhY_CvxWq9t4nZt6mzQ/edit?usp=sharing \"Gemini-powered Review And Code Evaluator\") | [Share Feedback](https://forms.gle/bpRX129ku5YMi9JLA) | [Walkthrough & Guide](https://drive.google.com/file/d/1paA9hswGG1MazQF_0WBvrZD9sKBUscOy/view?usp=drive_link)</sup>\n{BOT_MARKER}",
             "event": event,
             "comments": comments
         }
@@ -249,7 +249,7 @@ class GitHubClient:
         Posts a fallback issue comment if the main review fails to submit.
         """
         url = f"{self.base_url}/issues/{self.pr_number}/comments"
-        body = f"❌ **Review Failure Report**\n\nThe PR summarizer script failed to submit a formal review.\n\n**Error Details**:\n```\n{error_msg}\n```\n\n<br>\n\n<sup>[**Grace-{SCRIPT_VERSION}**](https://docs.google.com/presentation/d/1mN6SBazQFwcmtuBgiGhm184HVhY_CvxWq9t4nZt6mzQ/edit?usp=sharing \"Gemini-powered Review And Code Evaluator\") | [Share Feedback](https://forms.gle/bpRX129ku5YMi9JLA) | [Walkthrough & Guide](https://drive.google.com/file/d/1paA9hswGG1MazQF_0WBvrZD9sKBUscOy/view?usp=drive_link)</sup>\n{BOT_MARKER}"
+        body = f"❌ **Review Failure Report**\n\nThe PR summarizer script failed to submit a formal review.\n\n**Error Details**:\n```\n{error_msg}\n```\n\n<br><br>\n\n<sup>[**Grace-{SCRIPT_VERSION}**](https://docs.google.com/presentation/d/1mN6SBazQFwcmtuBgiGhm184HVhY_CvxWq9t4nZt6mzQ/edit?usp=sharing \"Gemini-powered Review And Code Evaluator\") | [Share Feedback](https://forms.gle/bpRX129ku5YMi9JLA) | [Walkthrough & Guide](https://drive.google.com/file/d/1paA9hswGG1MazQF_0WBvrZD9sKBUscOy/view?usp=drive_link)</sup>\n{BOT_MARKER}"
         print("🚀 Posting failure comment to PR...")
         return self._safe_request("POST", url, headers=self.api_headers, json={"body": body})
 
