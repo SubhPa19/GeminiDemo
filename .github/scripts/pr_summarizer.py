@@ -29,7 +29,7 @@ from typing import Any, Optional, Dict, Set, List
 # ==============================================================================
 # SCRIPT METADATA & CONSTANTS
 # ==============================================================================
-SCRIPT_VERSION = "2.4.14"
+SCRIPT_VERSION = "2.4.15"
 BOT_MARKER = f"<!-- gemini-bot-review-v{SCRIPT_VERSION} -->"
 
 # ==============================================================================
@@ -73,7 +73,7 @@ class GeminiClient(LLMClient):
         # Simple retry loop for standard network/transient failures
         for attempt in range(3):
             try:
-                res = requests.post(self.gemini_url, json=payload, headers=headers, timeout=60)
+                res = requests.post(self.gemini_url, json=payload, headers=headers, timeout=180)
                 res.raise_for_status()
                 response_json = res.json()
                 
