@@ -13,7 +13,7 @@ except ImportError:
     import sys
     import subprocess
     print("📦 Bootstrapping specific versions of tree-sitter to avoid breaking API changes...")
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "requests", "tree-sitter==0.21.3", "tree-sitter-languages==1.10.2"])
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "requests", "tree-sitter==0.21.3", "tree-sitter-languages==1.10.2", "--break-system-packages"])
 
 import json
 import requests
@@ -585,11 +585,24 @@ You are the {persona}. Verify findings and generate a dual JSON report.
 - Avoid using double quotes inside the markdown report if possible (use single quotes instead).
 - Double check that the "markdown_report" string is correctly escaped.
 
-**REQUIRED OUTPUT JSON KEYS**:
-1. "scratchpad": A string containing your step-by-step logical reasoning before generating the final verdict. Explicitly trace the execution flow of modified functions. Map out what happens if multiple threads hit this code simultaneously.
-2. "markdown_report": Full Markdown report text formatted EXACTLY as described below.
-3. "verified_findings": JSON logic array [{{"path": "path", "line": 123, "severity": "critical|minor", "critique": "text", "surgical_fix": "code"}}]
-4. "merge_verdict": 🟢 LGTM, 🟡 Needs Review, or 🔴 HARD STOP.
+**REQUIRED OUTPUT JSON STRUCTURE**:
+You MUST output EXACTLY one JSON object matching this structure:
+```json
+{{
+  "scratchpad": "Trace execution flow and thread safety here before writing the report.",
+  "markdown_report": "Full Markdown report text formatted EXACTLY as described below.",
+  "verified_findings": [
+    {{
+      "path": "path/to/file.kt",
+      "line": 123,
+      "severity": "critical",
+      "critique": "text",
+      "surgical_fix": "code"
+    }}
+  ],
+  "merge_verdict": "🔴 HARD STOP"
+}}
+```
 
 ### 📋 Formatting Guide for "markdown_report":
 Construct the "markdown_report" to be extremely concise, visual, and action-oriented. Do not write long paragraphs of text.
@@ -663,6 +676,10 @@ Checklist: {checklist}
             
             if not v_data:
                 print("⚠️ Verifier returned invalid or empty JSON.")
+            else:
+                if 'markdown_report' not in v_data:
+                    print(f"⚠️ VERIFIER OUTPUT MISSING 'markdown_report'. Keys found: {list(v_data.keys())}")
+                    print(f"RAW JSON:\n{json.dumps(v_data, indent=2)}")
 
             # 5. Extract Valid Diff Line Numbers
             valid_lines_map = DiffParser.parse_valid_lines(diff)
