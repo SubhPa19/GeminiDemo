@@ -25,7 +25,7 @@ from typing import Any, Optional, Dict, Set, List
 # ==============================================================================
 # SCRIPT METADATA & CONSTANTS
 # ==============================================================================
-SCRIPT_VERSION = "2.2.1"
+SCRIPT_VERSION = "2.2.2"
 BOT_MARKER = f"<!-- gemini-bot-review-v{SCRIPT_VERSION} -->"
 
 # ==============================================================================
@@ -576,10 +576,6 @@ You are the {persona}. Verify findings and generate a dual JSON report.
 {full_file_context}
 
 ### 🛡️ STRICT SELF-CORRECTION & GROUNDING RULES (DO THIS FIRST):
-
-**CORE DEDUPLICATION RULE**:
-Before finalizing your findings, you MUST aggressively deduplicate them. If multiple lines of code relate to the exact same root architectural issue (e.g., adding multiple un-synchronized methods to the same shared mutable list), you MUST combine them into a SINGLE critical finding pointing to the primary line. DO NOT output multiple separate findings for the same root cause.
-
 {verifier_grounding_rules}
 
 ### **STRICT JSON REQUIREMENTS**:
