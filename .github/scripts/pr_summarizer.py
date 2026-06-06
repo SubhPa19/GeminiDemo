@@ -25,7 +25,7 @@ from typing import Any, Optional, Dict, Set, List
 # ==============================================================================
 # SCRIPT METADATA & CONSTANTS
 # ==============================================================================
-SCRIPT_VERSION = "2.3.1"
+SCRIPT_VERSION = "2.3.2"
 BOT_MARKER = f"<!-- gemini-bot-review-v{SCRIPT_VERSION} -->"
 
 # ==============================================================================
@@ -624,7 +624,7 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
 2. **Action Required Punch List**:
    Present all findings as a highly compact, single-line bulleted list under '### 🛠️ Action Required'. Do not use blockquotes, card boxes, or expandable details blocks for this section. Maintain a clean, flat list where each line contains the severity emoji/label, file link with line anchor, and a very short description.
    
-   **STRICT GRANULARITY RULE**: You MUST report EVERY individual line of code that violates rules as a separate, distinct finding in this list. Do NOT group, aggregate, or abstract multiple line-level issues into a single high-level finding. If 4 different lines contain concurrency bugs, you MUST output 4 separate bullet points.
+   **STRICT GRANULARITY RULE**: You MUST report EVERY individual line of code that violates rules as a separate, distinct finding in this list. Do NOT group, aggregate, or abstract multiple line-level issues into a single high-level finding. For example, if N different lines contain bugs, you MUST output exactly N separate bullet points.
    
    **STRICT EMPTY SECTION EXCLUSION RULE**:
    If there are **0 issues**, you MUST completely omit the '### 🛠️ Action Required' section and its following divider line (`---`). Do not print the header or any bullet points.
