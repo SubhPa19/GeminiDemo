@@ -25,7 +25,7 @@ from typing import Any, Optional, Dict, Set, List
 # ==============================================================================
 # SCRIPT METADATA & CONSTANTS
 # ==============================================================================
-SCRIPT_VERSION = "2.2.2"
+SCRIPT_VERSION = "2.3.0"
 BOT_MARKER = f"<!-- gemini-bot-review-v{SCRIPT_VERSION} -->"
 
 # ==============================================================================
@@ -595,7 +595,7 @@ You MUST output EXACTLY one JSON object matching this structure:
     {{
       "path": "path/to/file.kt",
       "line": 123,
-      "severity": "critical",
+      "severity": "critical|major|minor",
       "critique": "text",
       "surgical_fix": "code"
     }}
@@ -614,26 +614,27 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
    - For '🟢 LGTM', use '> [!NOTE]' and the exact title '> ### 🟢 **Merge Verdict: LGTM**'
    
    **STRICT METRIC BOLDING RULE**:
-   Inside the 1-sentence professional justification, you MUST explicitly highlight the counts of critical stability/security issues and warnings in bold. For example, you MUST write: "This PR introduces **6 critical stability/security issues** and **2 warnings**." or similar. The numbers and the words "critical stability/security issues" and "warnings" MUST be wrapped in `**` to render in bold.
+   Inside the 1-sentence professional justification, you MUST explicitly highlight the counts of critical, major, and minor issues/warnings in bold. For example: "This PR introduces **2 critical**, **1 major**, and **2 minor** issues." or similar.
    
    Structure inside the block (exact markdown):
    > [!CAUTION] (or !WARNING / !NOTE)
    > ### [Verdict Emoji] **Merge Verdict: [Verdict Status]**
-   > [1-sentence justification with bolded metrics, e.g.: This PR introduces **6 critical stability/security issues** and **2 warnings**.
+   > [1-sentence justification with bolded metrics, e.g.: This PR introduces **2 critical**, **1 major**, and **2 minor** issues.]
    
 2. **Action Required Punch List**:
-   Present all critical issues and warnings as a highly compact, single-line bulleted list under '### 🛠️ Action Required'. Do not use blockquotes, card boxes, or expandable details blocks for this section. Maintain a clean, flat list where each line contains the severity emoji/label, file link with line anchor, and a very short description.
+   Present all findings as a highly compact, single-line bulleted list under '### 🛠️ Action Required'. Do not use blockquotes, card boxes, or expandable details blocks for this section. Maintain a clean, flat list where each line contains the severity emoji/label, file link with line anchor, and a very short description.
    
    **STRICT EMPTY SECTION EXCLUSION RULE**:
-   If there are **0 critical stability/security issues** and **0 warnings**, you MUST completely omit the '### 🛠️ Action Required' section and its following divider line (`---`). Do not print the header or any bullet points.
+   If there are **0 issues**, you MUST completely omit the '### 🛠️ Action Required' section and its following divider line (`---`). Do not print the header or any bullet points.
    
-   Structure inside the list (only output if critical/warnings > 0):
+   Structure inside the list (only output if issues > 0):
     ### 🛠️ Action Required
     
-    * 🔴 **Critical** | [File Name:Line Number](Relative_File_Path#LLine_Number) — **[Issue Category Name]**: [Short, punchy description of the issue]
-    * 🟡 **Warning** | [File Name:Line Number](Relative_File_Path#LLine_Number) — **[Issue Category Name]**: [Short, punchy description of the issue]
+    * 🔴 **Critical** | [File Name:Line Number](Relative_File_Path#LLine_Number) — **[Issue Category Name]**: [Short description]
+    * 🟠 **Major** | [File Name:Line Number](Relative_File_Path#LLine_Number) — **[Issue Category Name]**: [Short description]
+    * 🟡 **Minor/Warning** | [File Name:Line Number](Relative_File_Path#LLine_Number) — **[Issue Category Name]**: [Short description]
     
-    Follow this action items section immediately with a divider line (only if critical/warnings > 0):
+    Follow this action items section immediately with a divider line (only if issues > 0):
     ---
  
 3. **Definition of Done (DoD) Compliance (Table-Free & Accordion-Free)**:
@@ -647,7 +648,7 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
     - If there are no warnings, you MUST completely omit any '🟡 WARNING' bullet points.
     
     **STRICT DOD HIDE RULE FOR PERFECT PRs**:
-    If there are **0 critical stability/security issues** and **0 warnings** (meaning all DoD checks passed successfully and the verdict is `🟢 LGTM`), you MUST **completely omit the entire '### 🛡️ Definition of Done (DoD)' section** (including the heading, its contents, and the badges). The report should end immediately after the top alert block's divider line (`---`).
+    If there are **0 issues** (meaning all DoD checks passed successfully and the verdict is `🟢 LGTM`), you MUST **completely omit the entire '### 🛡️ Definition of Done (DoD)' section** (including the heading, its contents, and the badges). The report should end immediately after the top alert block's divider line (`---`).
     
     **STRICT PASSED CHECKS CATEGORY AGGREGATION RULE**:
     To eliminate text clutter and keep comments compact, you MUST NOT list every individual passed requirement by name. Instead, you MUST group all passed requirements by their Category Name and display them as a list of category badges with counts of passed checks in that category.
