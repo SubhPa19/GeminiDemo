@@ -385,7 +385,7 @@ class UniversalContextGrabber:
                     valid_files.add(filepath)
 
         # SAFETY VALVE: Skip full file context for massive PRs to maintain LLM focus
-        if len(valid_files) > 50:
+        if len(valid_files) > 25:
             print(f"⚠️ Massive PR detected ({len(valid_files)} files). Skipping Full File Context to preserve LLM focus; relying on Diff + AST only.")
             return ""
 
