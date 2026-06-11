@@ -506,6 +506,24 @@ class PRReviewOrchestrator:
    - *If YES:* Do not block the merge. Demote it to a minor warning or delete it entirely."""
 
         verifier_grounding_rules = config.get("verifier_grounding_rules", default_grounding)
+        
+        improvement_rule = """
+* **The Improvement vs. Issue Check:**
+  - *Is the candidate finding actually describing a positive change, refactoring, or robustness improvement introduced by the developer in the PR (e.g. adding guard clauses, extracting duplicate code, adding helper parameters) rather than a bug, security risk, crash risk, or architectural violation?*
+  - *If YES:* You MUST delete/reject this finding entirely. You are strictly forbidden from reporting developer improvements as issues/warnings.
+"""
+        
+        # Dynamically inject the rule if not already present
+        if "Improvement vs. Issue Check" not in str(verifier_grounding_rules):
+            if isinstance(verifier_grounding_rules, list):
+                verifier_grounding_rules.append(improvement_rule.strip())
+            elif isinstance(verifier_grounding_rules, str):
+                certainty_marker = "*Only output findings that survive"
+                if certainty_marker in verifier_grounding_rules:
+                    parts = verifier_grounding_rules.split(certainty_marker)
+                    verifier_grounding_rules = parts[0].rstrip() + "\n\n" + improvement_rule.strip() + "\n\n" + certainty_marker + parts[1]
+                else:
+                    verifier_grounding_rules = verifier_grounding_rules.rstrip() + "\n\n" + improvement_rule.strip()
 
         pr_summary_title = "PR Analysis"
         
@@ -618,13 +636,17 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
    - For '🟡 Needs Review', use '> [!WARNING]' and the exact title '> ### 🟡 **Merge Verdict: Needs Review**'
    - For '🟢 LGTM', use '> [!NOTE]' and the exact title '> ### 🟢 **Merge Verdict: LGTM**'
    
-   **STRICT METRIC BOLDING RULE**:
-   Inside the 1-sentence professional justification, you MUST explicitly highlight the counts of critical, major, and minor issues/warnings in bold. For example: "This PR introduces **2 critical**, **1 major**, and **2 minor** issues." or similar.
-   
-   Structure inside the block (exact markdown):
-   > [!CAUTION] (or !WARNING / !NOTE)
-   > ### [Verdict Emoji] **Merge Verdict: [Verdict Status]**
-   > [1-sentence justification with bolded metrics, e.g.: This PR introduces **2 critical**, **1 major**, and **2 minor** issues.]
+    **STRICT METRIC BOLDING RULE (For Hard Stop or Needs Review)**:
+    If the verdict is '🔴 HARD STOP' or '🟡 Needs Review', inside the 1-sentence professional justification you MUST explicitly highlight the counts of critical, major, and minor issues/warnings in bold. For example: "This PR introduces **2 critical**, **1 major**, and **2 minor** issues." or similar.
+    
+    **STRICT LGTM PRAISE RULE (For LGTM)**:
+    If the verdict is '🟢 LGTM' (0 issues), write a warm, highly encouraging, and professional appreciation message. Highlight in bold that the PR introduces **0 issues** or **no issues**. Then, follow it with a clean, bulleted list of 2-3 specific architectural or code quality highlights of the changes (e.g. Robustness, Clean Refactoring, Performance) summarizing what was done well.
+    
+    Structure inside the block (exact markdown):
+    > [!CAUTION] (or !WARNING / !NOTE)
+    > ### [Verdict Emoji] **Merge Verdict: [Verdict Status]**
+    > [1-sentence justification/praise with bolded metrics]
+    > [If LGTM, include empty line followed by key highlights bullet points]
    
 2. **Action Required Punch List**:
    Present all findings as a highly compact, single-line bulleted list under '### 🛠️ Action Required'. Do not use blockquotes, card boxes, or expandable details blocks for this section. Maintain a clean, flat list where each line contains the severity emoji/label, file link with line anchor, and a very short description.
