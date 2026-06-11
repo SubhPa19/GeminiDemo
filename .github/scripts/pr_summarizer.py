@@ -689,11 +689,16 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
     You MUST NOT use HTML tables, markdown tables, `<details>`, `<summary>`, or `<nobr>` tags anywhere in this section. The checklist MUST be rendered as flat list text and inline backticked badges.
     
     **STRICT EMPTY ITEM EXCLUSION RULE**:
-    - If there are no failed checks, you MUST completely omit any '🔴 FAILED' bullet points.
-    - If there are no warnings, you MUST completely omit any '🟡 WARNING' bullet points.
+    - If there are no failed checks, you MUST completely omit any '🔴 FAILED' sections.
+    - If there are no warnings, you MUST completely omit any '🟡 WARNING' sections.
     
     **STRICT DOD HIDE RULE**:
     If all DoD checks passed successfully (meaning there are 0 FAILED or WARNING checklist items, and only PASSED checks exist), you MUST **completely omit the entire '### 🛡️ Definition of Done (DoD)' section** (including the heading, its contents, and the badges) from the report.
+    
+    **STRICT CATEGORY GROUPING & NESTING RULE FOR FAILED/WARNING**:
+    - Group failed checklist items under `#### 🔴 FAILED` and warning checklist items under `#### 🟡 WARNING`. Only output a heading if there are items of that status.
+    - Within each status, you MUST group the items by their Category Name. Use a bold category title as a parent bullet point (e.g. `* **[Category Name]**:`), and list the individual checks as nested bullet points under it.
+    - Render each individual check in this format: `  * *[Requirement Description]* — [Finding Details]`
     
     **STRICT PASSED CHECKS CATEGORY AGGREGATION RULE**:
     To eliminate text clutter and keep comments compact, you MUST NOT list every individual passed requirement by name. Instead, you MUST group all passed requirements by their Category Name and display them as a list of category badges with counts of passed checks in that category.
@@ -702,8 +707,15 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
     
     ### 🛡️ Definition of Done (DoD)
     
-    * 🔴 **FAILED** | **[Category Name]** | *[Requirement Description]* — [Finding Details]
-    * 🟡 **WARNING** | **[Category Name]** | *[Requirement Description]* — [Finding Details]
+    #### 🔴 FAILED
+    * **[Category Name]**:
+      * *[Requirement Description]* — [Finding Details]
+      
+    #### 🟡 WARNING
+    * **[Category Name]**:
+      * *[Requirement Description]* — [Finding Details]
+    
+    ---
     
     * 🟢 **PASSED ([Total Count] Checks):** `[Category 1 Name] ([Passed Count 1])` • `[Category 2 Name] ([Passed Count 2])` • `[Category 3 Name] ([Passed Count 3])` • ...
 
