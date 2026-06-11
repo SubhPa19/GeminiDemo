@@ -655,8 +655,8 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
     - If there are no failed checks, you MUST completely omit any '🔴 FAILED' bullet points.
     - If there are no warnings, you MUST completely omit any '🟡 WARNING' bullet points.
     
-    **STRICT DOD HIDE RULE FOR PERFECT PRs**:
-    If there are **0 issues** (meaning all DoD checks passed successfully and the verdict is `🟢 LGTM`), you MUST **completely omit the entire '### 🛡️ Definition of Done (DoD)' section** (including the heading, its contents, and the badges). The report should end immediately after the top alert block's divider line (`---`).
+    **STRICT DOD HIDE RULE**:
+    If all DoD checks passed successfully (meaning there are 0 FAILED or WARNING checklist items, and only PASSED checks exist), you MUST **completely omit the entire '### 🛡️ Definition of Done (DoD)' section** (including the heading, its contents, and the badges) from the report.
     
     **STRICT PASSED CHECKS CATEGORY AGGREGATION RULE**:
     To eliminate text clutter and keep comments compact, you MUST NOT list every individual passed requirement by name. Instead, you MUST group all passed requirements by their Category Name and display them as a list of category badges with counts of passed checks in that category.
@@ -744,7 +744,20 @@ Checklist: {checklist}
             # 8. Submit Review
             author_mention = f"@{meta['author']}"
             header = f"{author_mention}\n\n"
-            full_body = header + v_data.get('markdown_report', "⚠️ Analysis report malformed.")
+            markdown_report = v_data.get('markdown_report', "⚠️ Analysis report malformed.")
+            
+            # Post-process to remove DoD section if all checks passed
+            if "### 🛡️ Definition of Done (DoD)" in markdown_report:
+                parts = markdown_report.split("### 🛡️ Definition of Done (DoD)")
+                prefix = parts[0]
+                dod_content = parts[1]
+                if "🔴" not in dod_content and "🟡" not in dod_content and "FAILED" not in dod_content.upper() and "WARNING" not in dod_content.upper():
+                    prefix = prefix.rstrip()
+                    if prefix.endswith("---"):
+                        prefix = prefix[:-3].rstrip()
+                    markdown_report = prefix
+            
+            full_body = header + markdown_report
             
             if fallback_comments:
                 print(f"ℹ️ {len(fallback_comments)} findings fell outside the diff and were excluded from the PR comment to reduce noise.")
