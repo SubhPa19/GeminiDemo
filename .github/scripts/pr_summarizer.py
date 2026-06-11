@@ -703,7 +703,7 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
       `* **[Category Name] | [N] Violations**` (use `Warnings` instead of `Violations` under the warning header).
     
     **STRICT PASSED CHECKS CATEGORY AGGREGATION RULE**:
-    - List all categories that completely passed (meaning they contain 0 FAILED and 0 WARNING checks) under the header `**🟢 Passed**`.
+    - List all categories that completely passed (meaning they contain 0 FAILED and 0 WARNING checks) under the header `**🟢 Passed | [Total Passed Count] checks**` (where [Total Passed Count] is the total number of passed checklist items across all categories in the entire run).
     - To eliminate text clutter and keep comments compact, you MUST NOT list every individual passed requirement by name. Instead, you MUST group all passed requirements by their Category Name (e.g. `Security`, `Documentation`, `PR Quality`) and display them on a single bulleted line using the format:
       `* [Category 1 Name] | [Passed Count 1] • [Category 2 Name] | [Passed Count 2] • ...`
       For example: `* Security | 2 • Documentation | 3 • PR Quality | 3`
@@ -718,7 +718,7 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
     **🟡 Warning**
     * **[Category Name] | [N] Warnings**
     
-    **🟢 Passed**
+    **🟢 Passed | [Total Passed Count] checks**
     * [Category Name] | [Count] • [Category Name] | [Count] • ...
 
 ---
