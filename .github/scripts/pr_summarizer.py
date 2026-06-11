@@ -29,7 +29,7 @@ from typing import Any, Optional, Dict, Set, List
 # ==============================================================================
 # SCRIPT METADATA & CONSTANTS
 # ==============================================================================
-SCRIPT_VERSION = "2.4.15"
+SCRIPT_VERSION = "2.4.16"
 BOT_MARKER = f"<!-- gemini-bot-review-v{SCRIPT_VERSION} -->"
 
 # ==============================================================================
@@ -747,7 +747,9 @@ Checklist: {checklist}
             full_body = header + v_data.get('markdown_report', "⚠️ Analysis report malformed.")
             
             if fallback_comments:
-                full_body += "\n\n### 📝 General Findings (Outside Diff)\n\n" + "\n\n---\n\n".join(fallback_comments)
+                print(f"ℹ️ {len(fallback_comments)} findings fell outside the diff and were excluded from the PR comment to reduce noise.")
+                for i, fc in enumerate(fallback_comments, 1):
+                    print(f"  📝 Outside-Diff Finding #{i}: {fc[:200]}...")
             
             print(f"Attempting to submit review with {len(bundled_comments)} inline findings and {len(fallback_comments)} general findings...")
             res = self.gh.submit_bundled_review(full_body, github_event, bundled_comments)
