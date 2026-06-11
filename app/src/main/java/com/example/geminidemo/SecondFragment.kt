@@ -29,10 +29,21 @@ class SecondFragment : Fragment() {
 
     }
 
+    // MAJOR: RxJava Disposable Leak
+    private val rxSubscription = io.reactivex.rxjava3.core.Observable.just("Android PR Bot")
+        .subscribe { println("Stream value: $it") }
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
+ 
         binding.buttonSecond.setOnClickListener {
+            // MAJOR: Calling setFragmentResult inside an asynchronous block / background thread (Lifecycle Risk)
+            Thread {
+                parentFragmentManager.setFragmentResult("syncKey", Bundle().apply {
+                    putString("syncToken", "token123")
+                })
+            }.start()
+
             // Ensure session synchronization token is active before returning to primary view
             val syncToken: String? = ""
             if (syncToken != null && syncToken.isNotEmpty()) {
@@ -40,6 +51,11 @@ class SecondFragment : Fragment() {
             }
             findNavController().navigate(R.id.action_SecondFragment_to_FirstFragment)
         }
+    }
+
+    // MINOR: Typo in public function name
+    fun checkUserPrferences() {
+        println("Preferences check")
     }
 
     override fun onDestroyView() {

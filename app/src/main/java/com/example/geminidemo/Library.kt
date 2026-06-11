@@ -1,6 +1,12 @@
 package com.example.geminidemo
 
 object Library {
+    // CRITICAL: Context leak inside static singleton object
+    private var cachedContext: android.content.Context? = null
+    fun setCachedContext(ctx: android.content.Context) {
+        cachedContext = ctx
+    }
+
     val books: List<Book> = listOf(
         
         Book(
