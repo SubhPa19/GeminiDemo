@@ -649,19 +649,34 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
     > [If LGTM, include empty line followed by key highlights bullet points]
    
 2. **Action Required Punch List**:
-   Present all findings as a highly compact, single-line bulleted list under '### 🛠️ Action Required'. Do not use blockquotes, card boxes, or expandable details blocks for this section. Maintain a clean, flat list where each line contains the severity emoji/label, file link with line anchor, and a very short description.
+   Present all findings grouped by severity and aggregated by category under '### 🛠️ Action Required'. Do not use blockquotes, card boxes, or expandable details blocks.
    
-   **STRICT GRANULARITY RULE**: You MUST report EVERY individual line of code that violates rules as a separate, distinct finding in this list. Do NOT group, aggregate, or abstract multiple line-level issues into a single high-level finding. For example, if N different lines contain bugs, you MUST output exactly N separate bullet points.
+   **STRICT CATEGORY GROUPING & AGGREGATION RULE**:
+   - You MUST group findings under the following three subheadings (only output a subheading if there are findings of that severity):
+     - `#### 🔴 Critical`
+     - `#### 🟠 Major`
+     - `#### 🟡 Minor / Warnings`
+   - Within each severity level, you MUST group and aggregate duplicate or highly similar findings of the same category/type into a single bullet point.
+   - If there is only **1 instance** of an issue category under that severity, use this format:
+     `* **[Issue Category Name]:** [Short description of the issue]. | [[File Name:Line Number]](../blob/{meta['head_sha']}/Relative_Path#L[Line])`
+   - If there are **multiple instances** (e.g. N instances) of the same issue category under that severity, consolidate them into a single bullet point using this format:
+     `* **[N] Instances of [Issue Category Name]:** [Short description of the issue]. | [[File Name 1:Line Number 1]](../blob/{meta['head_sha']}/Relative_Path_1#L[Line_1]), [[File Name 2:Line Number 2]](../blob/{meta['head_sha']}/Relative_Path_2#L[Line_2]), ...`
    
    **STRICT EMPTY SECTION EXCLUSION RULE**:
-   If there are **0 issues**, you MUST completely omit the '### 🛠️ Action Required' section and its following divider line (`---`). Do not print the header or any bullet points.
+   If there are **0 issues**, you MUST completely omit the '### 🛠️ Action Required' section and its following divider line (`---`). Do not print the header, subheadings, or any bullet points.
    
    Structure inside the list (only output if issues > 0):
     ### 🛠️ Action Required
     
-    * 🔴 **Critical** | [File Name:Line Number](../blob/{meta['head_sha']}/Relative_File_Path#L<Line_Number>) — **[Issue Category Name]**: [Short description]
-    * 🟠 **Major** | [File Name:Line Number](../blob/{meta['head_sha']}/Relative_File_Path#L<Line_Number>) — **[Issue Category Name]**: [Short description]
-    * 🟡 **Minor/Warning** | [File Name:Line Number](../blob/{meta['head_sha']}/Relative_File_Path#L<Line_Number>) — **[Issue Category Name]**: [Short description]
+    #### 🔴 Critical
+    * **[Issue Category Name]:** [Short description]. | [[File Name:Line Number]](../blob/{meta['head_sha']}/Relative_Path#L[Line])
+    * **[N] Instances of [Issue Category Name]:** [Short description]. | [[File Name 1:Line Number 1]](../blob/{meta['head_sha']}/Relative_Path_1#L[Line_1]), [[File Name 2:Line Number 2]](../blob/{meta['head_sha']}/Relative_Path_2#L[Line_2])
+    
+    #### 🟠 Major
+    * **[Issue Category Name]:** [Short description]. | [[File Name:Line Number]](../blob/{meta['head_sha']}/Relative_Path#L[Line])
+    
+    #### 🟡 Minor / Warnings
+    * **[Issue Category Name]:** [Short description]. | [[File Name:Line Number]](../blob/{meta['head_sha']}/Relative_Path#L[Line])
     
     Follow this action items section with a divider line (only if issues > 0), ensuring there is an empty line before the divider:
     
