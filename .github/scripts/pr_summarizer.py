@@ -696,29 +696,29 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
     If all DoD checks passed successfully (meaning there are 0 FAILED or WARNING checklist items, and only PASSED checks exist), you MUST **completely omit the entire '### 🛡️ Definition of Done (DoD)' section** (including the heading and its contents) from the report.
     
     **STRICT CATEGORY GROUPING & AGGREGATION RULE FOR FAILED/WARNING**:
-    - Group categories that contain any failed checks under the header `🔴 Failed Categories` (if any failed checks exist).
-    - Group categories that contain any warning checks (but no failed checks) under the header `🟡 Warning Categories` (if any warning checks exist).
-    - If a category contains both failed and warning checks, group it under `🔴 Failed Categories` and count all of them as violations.
-    - For each category in these sections, write a single line formatted as follows:
-      `**[Category Name] | [N] Violations:** [A concise, one-sentence summary of the specific violation/issue instances found].` (use `Warnings` instead of `Violations` under the warning header).
+    - Group categories that contain any failed checks under the header `**🔴 Failed Categories**` (if any failed checks exist).
+    - Group categories that contain any warning checks (but no failed checks) under the header `**🟡 Warning Categories**` (if any warning checks exist).
+    - If a category contains both failed and warning checks, group it under `**🔴 Failed Categories**` and count all of them as violations.
+    - For each category in these sections, write a bulleted line formatted as follows:
+      `* **[Category Name] | [N] Violations:** [A concise, one-sentence summary of the specific violation/issue instances found].` (use `Warnings` instead of `Violations` under the warning header).
     
     **STRICT PASSED CHECKS CATEGORY AGGREGATION RULE**:
-    - List all categories that completely passed (meaning they contain 0 FAILED and 0 WARNING checks) under the header `🟢 Passed Categories`.
-    - Format this list on a single line, separating each category with ` • `:
-      `[Category 1 Name] | [Passed Count 1] • [Category 2 Name] | [Passed Count 2] • ...`
+    - List all categories that completely passed (meaning they contain 0 FAILED and 0 WARNING checks) under the header `**🟢 Passed Categories**`.
+    - Format this list on a single bulleted line, separating each category with ` • `:
+      `* [Category 1 Name] | [Passed Count 1] • [Category 2 Name] | [Passed Count 2] • ...`
     
     Ensure you output EXACTLY the following structure under the header, dynamically hiding the empty parts based on the rules above:
     
     ### 🛡️ Definition of Done (DoD)
     
-    🔴 Failed Categories
-    **[Category Name] | [N] Violations:** [One-sentence summary of violation instances].
+    **🔴 Failed Categories**
+    * **[Category Name] | [N] Violations:** [One-sentence summary of violation instances].
     
-    🟡 Warning Categories
-    **[Category Name] | [N] Warnings:** [One-sentence summary of warning instances].
+    **🟡 Warning Categories**
+    * **[Category Name] | [N] Warnings:** [One-sentence summary of warning instances].
     
-    🟢 Passed Categories
-    [Category Name] | [Count] • [Category Name] | [Count] • ...
+    **🟢 Passed Categories**
+    * [Category Name] | [Count] • [Category Name] | [Count] • ...
 
 ---
 
