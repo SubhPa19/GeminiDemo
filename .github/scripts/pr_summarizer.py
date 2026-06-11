@@ -689,35 +689,36 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
     You MUST NOT use HTML tables, markdown tables, `<details>`, `<summary>`, or `<nobr>` tags anywhere in this section. The checklist MUST be rendered as flat list text and inline backticked badges.
     
     **STRICT EMPTY ITEM EXCLUSION RULE**:
-    - If there are no failed checks, you MUST completely omit any '🔴 FAILED' sections.
-    - If there are no warnings, you MUST completely omit any '🟡 WARNING' sections.
+    - If there are no failed checks, you MUST completely omit any '🔴 Failed Categories' sections.
+    - If there are no warnings, you MUST completely omit any '🟡 Warning Categories' sections.
     
     **STRICT DOD HIDE RULE**:
-    If all DoD checks passed successfully (meaning there are 0 FAILED or WARNING checklist items, and only PASSED checks exist), you MUST **completely omit the entire '### 🛡️ Definition of Done (DoD)' section** (including the heading, its contents, and the badges) from the report.
+    If all DoD checks passed successfully (meaning there are 0 FAILED or WARNING checklist items, and only PASSED checks exist), you MUST **completely omit the entire '### 🛡️ Definition of Done (DoD)' section** (including the heading and its contents) from the report.
     
-    **STRICT CATEGORY GROUPING & NESTING RULE FOR FAILED/WARNING**:
-    - Group failed checklist items under `#### 🔴 FAILED` and warning checklist items under `#### 🟡 WARNING`. Only output a heading if there are items of that status.
-    - Within each status, you MUST group the items by their Category Name. Use a bold category title as a parent bullet point (e.g. `* **[Category Name]**:`), and list the individual checks as nested bullet points under it.
-    - Render each individual check in this format: `  * *[Requirement Description]* — [Finding Details]`
+    **STRICT CATEGORY GROUPING & AGGREGATION RULE FOR FAILED/WARNING**:
+    - Group categories that contain any failed checks under the header `🔴 Failed Categories` (if any failed checks exist).
+    - Group categories that contain any warning checks (but no failed checks) under the header `🟡 Warning Categories` (if any warning checks exist).
+    - If a category contains both failed and warning checks, group it under `🔴 Failed Categories` and count all of them as violations.
+    - For each category in these sections, write a single line formatted as follows:
+      `**[Category Name] | [N] Violations:** [A concise, one-sentence summary of the specific violation/issue instances found].` (use `Warnings` instead of `Violations` under the warning header).
     
     **STRICT PASSED CHECKS CATEGORY AGGREGATION RULE**:
-    To eliminate text clutter and keep comments compact, you MUST NOT list every individual passed requirement by name. Instead, you MUST group all passed requirements by their Category Name and display them as a list of category badges with counts of passed checks in that category.
+    - List all categories that completely passed (meaning they contain 0 FAILED and 0 WARNING checks) under the header `🟢 Passed Categories`.
+    - Format this list on a single line, separating each category with ` • `:
+      `[Category 1 Name] | [Passed Count 1] • [Category 2 Name] | [Passed Count 2] • ...`
     
     Ensure you output EXACTLY the following structure under the header, dynamically hiding the empty parts based on the rules above:
     
     ### 🛡️ Definition of Done (DoD)
     
-    #### 🔴 FAILED
-    * **[Category Name]**:
-      * *[Requirement Description]* — [Finding Details]
-      
-    #### 🟡 WARNING
-    * **[Category Name]**:
-      * *[Requirement Description]* — [Finding Details]
+    🔴 Failed Categories
+    **[Category Name] | [N] Violations:** [One-sentence summary of violation instances].
     
-    ---
+    🟡 Warning Categories
+    **[Category Name] | [N] Warnings:** [One-sentence summary of warning instances].
     
-    * 🟢 **PASSED ([Total Count] Checks):** `[Category 1 Name] ([Passed Count 1])` • `[Category 2 Name] ([Passed Count 2])` • `[Category 3 Name] ([Passed Count 3])` • ...
+    🟢 Passed Categories
+    [Category Name] | [Count] • [Category Name] | [Count] • ...
 
 ---
 
