@@ -697,15 +697,16 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
     
     **STRICT CATEGORY GROUPING & AGGREGATION RULE FOR FAILED/WARNING**:
     - Group categories that contain any failed checks under the header `**🔴 Failed**` (if any failed checks exist).
-    - Group categories that contain any warning checks (but no failed checks) under the header `**🟡 Warning**` (if any warning checks exist).
-    - If a category contains both failed and warning checks, group it under `**🔴 Failed**` and count all of them as violations.
+    - Group categories that contain ONLY warning checks (and zero failed checks) under the header `**🟡 Warning**` (if any warning checks exist).
+    - A category MUST NOT appear in both the Failed and Warning lists. If a category contains both failed and warning checks, it MUST ONLY appear under `**🔴 Failed**`, and you MUST count the total of all failed and warning checks in that category as "Violations".
     - For each category in these sections, write a bulleted line formatted as follows:
       `* **[Category Name] | [N] Violations**` (use `Warnings` instead of `Violations` under the warning header).
     
     **STRICT PASSED CHECKS CATEGORY AGGREGATION RULE**:
     - List all categories that completely passed (meaning they contain 0 FAILED and 0 WARNING checks) under the header `**🟢 Passed**`.
-    - Format this list on a single bulleted line, separating each category with ` • `:
+    - To eliminate text clutter and keep comments compact, you MUST NOT list every individual passed requirement by name. Instead, you MUST group all passed requirements by their Category Name (e.g. `Security`, `Documentation`, `PR Quality`) and display them on a single bulleted line using the format:
       `* [Category 1 Name] | [Passed Count 1] • [Category 2 Name] | [Passed Count 2] • ...`
+      For example: `* Security | 2 • Documentation | 3 • PR Quality | 3`
     
     Ensure you output EXACTLY the following structure under the header, dynamically hiding the empty parts based on the rules above:
     
