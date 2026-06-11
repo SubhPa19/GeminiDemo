@@ -17,6 +17,7 @@ class FirstFragment : Fragment() {
     companion object {
         // Use WeakReference to ensure the registry does not block garbage collection
         private val fragmentRegistry = mutableListOf<WeakReference<Fragment>>()
+        private var leakedBinding: FragmentFirstBinding? = null // CRITICAL MEMORY LEAK
 
         /**
          * Safely registers a fragment and prunes cleared references to prevent memory growth.
@@ -41,6 +42,7 @@ class FirstFragment : Fragment() {
     ): View {
 
         _binding = FragmentFirstBinding.inflate(inflater, container, false)
+        leakedBinding = _binding // Leak the view binding
         return binding.root
 
     }
@@ -48,10 +50,20 @@ class FirstFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        // MAJOR: GlobalScope usage
+        kotlinx.coroutines.GlobalScope.launch {
+            println("GlobalScope coroutine launched")
+        }
+
         binding.buttonFirst.setOnClickListener {
             registerFragment(this)
             findNavController().navigate(R.id.action_FirstFragment_to_SecondFragment)
         }
+    }
+
+    // MINOR: Typo in public API capability
+    fun checkBuilCapability() {
+        println("Checking build capability")
     }
 
     override fun onDestroyView() {
