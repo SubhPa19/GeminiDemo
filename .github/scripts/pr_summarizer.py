@@ -701,24 +701,11 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
       For example: `* 🔴 **FAILED | 10 Checks:** `Code Quality 2` | `Architecture 1` | `Performance 3` | `Memory & Lifecycle 4``
     
     **STRICT PASSED CHECKS CATEGORY AGGREGATION RULE**:
-    - To eliminate text clutter and keep comments compact, you MUST NOT list every individual passed requirement by name. Instead, you MUST group all passed requirements by their Category Name (e.g. `Security`, `Documentation`, `PR Quality`) and display them inside a collapsible details block.
+    - To eliminate text clutter and keep comments compact, you MUST NOT list every individual passed requirement by name. Instead, you MUST group all passed requirements by their Category Name (e.g. `Security`, `Documentation`, `PR Quality`) and display them on a single bulleted line using category badges with counts of passed checks.
     - You MUST limit the list of passed categories to a maximum of 5 categories (pick the first 5 completely passed categories if there are more than 5).
-    - Format this details block under the header exactly as follows (using `<details>` and `<summary>` tags to collapse the passed badges, and `|` as the separator):
-      ```html
-      <details>
-      <summary>Passed | [Total Passed Count] Checks</summary>
-
-      `[Category 1 Name] [Passed Count 1]` | `[Category 2 Name] [Passed Count 2]` | ...
-      </details>
-      ```
-      For example:
-      ```html
-      <details>
-      <summary>Passed | 11 Checks</summary>
-
-      `Security 2` | `Documentation 1` | `PR Quality 3`
-      </details>
-      ```
+    - Format this line under the header exactly as follows (using `|` as the separator between badges, and no parentheses around the count):
+      `* 🟢 **PASSED | [Total Passed Count] Checks:** `[Category 1 Name] [Passed Count 1]` | `[Category 2 Name] [Passed Count 2]` | ...`
+      For example: `* 🟢 **PASSED | 11 Checks:** `Security 2` | `Documentation 1` | `PR Quality 3``
     
     Ensure you output EXACTLY the following structure under the header, dynamically hiding the empty parts based on the rules above:
     
@@ -726,11 +713,7 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
     
     * 🔴 **FAILED | [Total Failed Count] Checks:** `[Category 1 Name] [Violations Count 1]` | `[Category 2 Name] [Violations Count 2]` | ...
     
-    <details>
-    <summary>Passed | [Total Passed Count] Checks</summary>
-    
-    `[Category 1 Name] [Passed Count 1]` | `[Category 2 Name] [Passed Count 2]` | ...
-    </details>
+    * 🟢 **PASSED | [Total Passed Count] Checks:** `[Category 1 Name] [Passed Count 1]` | `[Category 2 Name] [Passed Count 2]` | ...
 
 ---
 
