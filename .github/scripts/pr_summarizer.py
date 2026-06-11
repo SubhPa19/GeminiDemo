@@ -682,44 +682,55 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
     
     ---
 
-3. **Definition of Done (DoD) Compliance (Table-Free & Accordion-Free)**:
+3. **Definition of Done (DoD) Compliance (Table-Free)**:
     Present the Definition of Done (DoD) compliance checklist as a clean, flat list under '### 🛡️ Definition of Done (DoD)'.
     
-    **STRICT NO-TABLE/NO-ACCORDION RULE**:
-    You MUST NOT use HTML tables, markdown tables, `<details>`, `<summary>`, or `<nobr>` tags anywhere in this section. The checklist MUST be rendered as flat list text and inline backticked badges.
+    **STRICT NO-TABLE RULE**:
+    You MUST NOT use HTML tables, markdown tables, or `<nobr>` tags anywhere in this section.
     
     **STRICT EMPTY ITEM EXCLUSION RULE**:
-    - If there are no failed checks, you MUST completely omit any '🔴 Failed Categories' sections.
-    - If there are no warnings, you MUST completely omit any '🟡 Warning Categories' sections.
+    - If there are no failed checks, you MUST completely omit the '🔴 FAILED' section.
     
     **STRICT DOD HIDE RULE**:
-    If all DoD checks passed successfully (meaning there are 0 FAILED or WARNING checklist items, and only PASSED checks exist), you MUST **completely omit the entire '### 🛡️ Definition of Done (DoD)' section** (including the heading and its contents) from the report.
+    If all DoD checks passed successfully (meaning there are 0 FAILED checklist items, and only PASSED checks exist), you MUST **completely omit the entire '### 🛡️ Definition of Done (DoD)' section** (including the heading and its contents) from the report.
     
-    **STRICT CATEGORY GROUPING & AGGREGATION RULE FOR FAILED/WARNING**:
-    - Group categories that contain any failed checks under the header `**🔴 Failed**` (if any failed checks exist).
-    - Group categories that contain ONLY warning checks (and zero failed checks) under the header `**🟡 Warning**` (if any warning checks exist).
-    - A category MUST NOT appear in both the Failed and Warning lists. If a category contains both failed and warning checks, it MUST ONLY appear under `**🔴 Failed**`, and you MUST count the total of all failed and warning checks in that category as "Violations".
-    - For each category in these sections, write a bulleted line formatted as follows:
-      `* **[Category Name] | [N] Violations**` (use `Warnings` instead of `Violations` under the warning header).
+    **STRICT CATEGORY GROUPING & AGGREGATION RULE FOR FAILED**:
+    - Group categories that contain any failed checks under the header `**🔴 FAILED | [Total Failed Count] Checks:**`.
+    - Format this line under the header exactly as follows (using `|` as the separator between badges, and no parentheses around the count):
+      `* 🔴 **FAILED | [Total Failed Count] Checks:** `[Category 1 Name] [Violations Count 1]` | `[Category 2 Name] [Violations Count 2]` | ...`
+      For example: `* 🔴 **FAILED | 10 Checks:** `Code Quality 2` | `Architecture 1` | `Performance 3` | `Memory & Lifecycle 4``
     
     **STRICT PASSED CHECKS CATEGORY AGGREGATION RULE**:
-    - List all categories that completely passed (meaning they contain 0 FAILED and 0 WARNING checks) under the header `**🟢 Passed | [Total Passed Count] checks**` (where [Total Passed Count] is the total number of passed checklist items across all categories in the entire run).
-    - To eliminate text clutter and keep comments compact, you MUST NOT list every individual passed requirement by name. Instead, you MUST group all passed requirements by their Category Name (e.g. `Security`, `Documentation`, `PR Quality`) and display them on a single bulleted line using the format:
-      `* [Category 1 Name] | [Passed Count 1] • [Category 2 Name] | [Passed Count 2] • ...`
-      For example: `* Security | 2 • Documentation | 3 • PR Quality | 3`
+    - To eliminate text clutter and keep comments compact, you MUST NOT list every individual passed requirement by name. Instead, you MUST group all passed requirements by their Category Name (e.g. `Security`, `Documentation`, `PR Quality`) and display them inside a collapsible details block.
+    - You MUST limit the list of passed categories to a maximum of 5 categories (pick the first 5 completely passed categories if there are more than 5).
+    - Format this details block under the header exactly as follows (using `<details>` and `<summary>` tags to collapse the passed badges, and `|` as the separator):
+      ```html
+      <details>
+      <summary>Passed | [Total Passed Count] Checks</summary>
+
+      `[Category 1 Name] [Passed Count 1]` | `[Category 2 Name] [Passed Count 2]` | ...
+      </details>
+      ```
+      For example:
+      ```html
+      <details>
+      <summary>Passed | 11 Checks</summary>
+
+      `Security 2` | `Documentation 1` | `PR Quality 3`
+      </details>
+      ```
     
     Ensure you output EXACTLY the following structure under the header, dynamically hiding the empty parts based on the rules above:
     
     ### 🛡️ Definition of Done (DoD)
     
-    **🔴 Failed**
-    * **[Category Name] | [N] Violations**
+    * 🔴 **FAILED | [Total Failed Count] Checks:** `[Category 1 Name] [Violations Count 1]` | `[Category 2 Name] [Violations Count 2]` | ...
     
-    **🟡 Warning**
-    * **[Category Name] | [N] Warnings**
+    <details>
+    <summary>Passed | [Total Passed Count] Checks</summary>
     
-    **🟢 Passed | [Total Passed Count] checks**
-    * [Category Name] | [Count] • [Category Name] | [Count] • ...
+    `[Category 1 Name] [Passed Count 1]` | `[Category 2 Name] [Passed Count 2]` | ...
+    </details>
 
 ---
 
