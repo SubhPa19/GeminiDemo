@@ -29,7 +29,7 @@ from typing import Any, Optional, Dict, Set, List
 # ==============================================================================
 # SCRIPT METADATA & CONSTANTS
 # ==============================================================================
-SCRIPT_VERSION = "2.4.17"
+SCRIPT_VERSION = "2.4.18"
 BOT_MARKER = f"<!-- gemini-bot-review-v{SCRIPT_VERSION} -->"
 
 # ==============================================================================
@@ -656,11 +656,17 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
      - `#### 🔴 Critical`
      - `#### 🟠 Major`
      - `#### 🟡 Minor / Warnings`
-   - Within each severity level, you MUST group and aggregate duplicate or highly similar findings of the same category/type into a single bullet point.
-   - If there is only **1 instance** of an issue category under that severity, use this format:
-     `* **[Issue Category Name]:** [Short description of the issue]. | [[File Name:Line Number]](../blob/{meta['head_sha']}/Relative_Path#L[Line])`
-   - If there are **multiple instances** (e.g. N instances) of the same issue category under that severity, consolidate them into a single bullet point using this format:
-     `* **[N] Instances of [Issue Category Name]:** [Short description of the issue]. | [[File Name 1:Line Number 1]](../blob/{meta['head_sha']}/Relative_Path_1#L[Line_1]), [[File Name 2:Line Number 2]](../blob/{meta['head_sha']}/Relative_Path_2#L[Line_2]), ...`
+   - Format each aggregated category as a single bullet point. It must contain the issue category name (and count if multiple) in bold, followed by a pipe separator (` | `), followed by the file(s) and their respective line numbers:
+     - If there is only **1 instance** of an issue category under that severity:
+       `* **[Issue Category Name]** | [File Name](../blob/{meta['head_sha']}/Relative_Path), Line [Lines]`
+     - If there are **multiple instances** (e.g., N instances) of the same issue category under that severity, group them by file name and join the files using standard list formatting (e.g., `[File 1], Line [Lines 1] and [File 2], Line [Lines 2]` or `[File 1], Line [Lines 1], [File 2], Line [Lines 2] and [File 3], Line [Lines 3]`):
+       `* **[N] Instance of [Issue Category Name]** | [File Name 1](../blob/{meta['head_sha']}/Relative_Path_1), Line [Lines 1], [File Name 2](../blob/{meta['head_sha']}/Relative_Path_2), Line [Lines 2] and [File Name 3](../blob/{meta['head_sha']}/Relative_Path_3), Line [Lines 3]`
+   - DO NOT include descriptions or extra text. Keep it extremely concise.
+   - File Name Link format: Standard markdown link `[File Name](../blob/{meta['head_sha']}/Relative_Path)` pointing to the file (no line number anchor in the URL path).
+   - Line number format (based on the number of findings in that file):
+     - If 1 line: `, Line [Line_1]` (e.g. `, Line 33`)
+     - If 2 lines: `, Line [Line_1] and [Line_2]` (e.g. `, Line 20 and 45`)
+     - If 3+ lines: `, Line [Line_1], [Line_2] and [Line_3]` (e.g. `, Line 4, 5 and 6`)
    
    **STRICT EMPTY SECTION EXCLUSION RULE**:
    If there are **0 issues**, you MUST completely omit the '### 🛠️ Action Required' section and its following divider line (`---`). Do not print the header, subheadings, or any bullet points.
@@ -669,14 +675,15 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
     ### 🛠️ Action Required
     
     #### 🔴 Critical
-    * **[Issue Category Name]:** [Short description]. | [[File Name:Line Number]](../blob/{meta['head_sha']}/Relative_Path#L[Line])
-    * **[N] Instances of [Issue Category Name]:** [Short description]. | [[File Name 1:Line Number 1]](../blob/{meta['head_sha']}/Relative_Path_1#L[Line_1]), [[File Name 2:Line Number 2]](../blob/{meta['head_sha']}/Relative_Path_2#L[Line_2])
+    * **Context Memory Leak** | [Library.kt](../blob/{meta['head_sha']}/app/src/main/java/com/example/Library.kt), Line 4
+    * **3 Instance of Context Memory Leak** | [Library.kt](../blob/{meta['head_sha']}/app/src/main/java/com/example/Library.kt), Line 4, 5 and 6
+    * **6 Instance of Context Memory Leak** | [Library.kt](../blob/{meta['head_sha']}/app/src/main/java/com/example/Library.kt), Line 4, 5 and 6, [MainActivity.kt](../blob/{meta['head_sha']}/app/src/main/java/com/example/MainActivity.kt), Line 12 and [AppService.kt](../blob/{meta['head_sha']}/app/src/main/java/com/example/AppService.kt), Line 20 and 21
     
     #### 🟠 Major
-    * **[Issue Category Name]:** [Short description]. | [[File Name:Line Number]](../blob/{meta['head_sha']}/Relative_Path#L[Line])
+    * **[Issue Category Name]** | [File Name](../blob/{meta['head_sha']}/Relative_Path), Line [Lines]
     
     #### 🟡 Minor / Warnings
-    * **[Issue Category Name]:** [Short description]. | [[File Name:Line Number]](../blob/{meta['head_sha']}/Relative_Path#L[Line])
+    * **[Issue Category Name]** | [File Name](../blob/{meta['head_sha']}/Relative_Path), Line [Lines]
     
     Follow this action items section with a divider line (only if issues > 0), ensuring there is an empty line before the divider:
     
