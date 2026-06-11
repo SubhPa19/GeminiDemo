@@ -50,10 +50,6 @@ class FirstFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // MAJOR: GlobalScope usage
-        kotlinx.coroutines.GlobalScope.launch {
-            println("GlobalScope coroutine launched")
-        }
 
         binding.buttonFirst.setOnClickListener {
             registerFragment(this)
