@@ -120,21 +120,21 @@ class GeminiClient(LLMClient):
             clean_text = re.sub(r'\s*```$', '', clean_text)
         
         try:
-            return json.loads(clean_text)
+            return json.loads(clean_text, strict=False)
         except json.JSONDecodeError as e:
             print(f"⚠️ Initial JSON parse failed: {e}. Attempting extraction...")
             # Fallback: Extract the first { ... } or [ ... ] block
             match = re.search(r'(\{.*\}|\[.*\])', clean_text, re.DOTALL)
             if match:
                 try:
-                    return json.loads(match.group(1))
+                    return json.loads(match.group(1), strict=False)
                 except json.JSONDecodeError as e2:
                     print(f"❌ Extraction fallback also failed: {e2}")
             
             # Final attempt: handle potential unescaped control characters
             try:
                 sanitized = re.sub(r'(?<!\\)\n', '\\n', clean_text)
-                return json.loads(sanitized)
+                return json.loads(sanitized, strict=False)
             except Exception as e3:
                 print(f"❌ Final fallback sanitization also failed: {e3}")
                 return None
