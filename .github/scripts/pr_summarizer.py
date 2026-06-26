@@ -29,7 +29,7 @@ from typing import Any, Optional, Dict, Set, List
 # ==============================================================================
 # SCRIPT METADATA & CONSTANTS
 # ==============================================================================
-SCRIPT_VERSION = "2.4.18"
+SCRIPT_VERSION = "2.4.21"
 BOT_MARKER = f"<!-- gemini-bot-review-v{SCRIPT_VERSION} -->"
 
 # ==============================================================================
@@ -88,6 +88,8 @@ class GeminiClient(LLMClient):
                 return text
             except Exception as e:
                 print(f"⚠️ Gemini request attempt {attempt+1} failed: {e}")
+                if 'res' in locals() and res is not None:
+                    print(f"   API Response: {res.text}")
                 time.sleep(2 ** attempt + 1)
         return None
 
@@ -540,6 +542,10 @@ class PRReviewOrchestrator:
                 self.gh.post_failure_comment("PR diff is empty or could not be fetched.")
                 sys.exit(1)
 
+            # 2.1 Extract Valid Diff Line Numbers
+            valid_lines_map = DiffParser.parse_valid_lines(diff)
+            valid_lines_str = "\n".join([f"- `{path}`: lines {sorted(list(lines))}" for path, lines in valid_lines_map.items()])
+
             # Retrieve checklist template
             checklist = self.gh.fetch_checklist(meta['base_branch'], self.checklist_path) or default_checklist
 
@@ -597,6 +603,12 @@ You are the {persona}. Verify findings and generate a dual JSON report.
 {codebase_context}
 
 {full_file_context}
+
+### 📝 ONLY ANALYZE AND REPORT ON THESE MODIFIED LINES:
+Below is the list of files and the exact line numbers that were added or modified in the PR:
+{valid_lines_str}
+
+CRITICAL: You are strictly forbidden from reporting any issues or violations on lines not listed above. Any issue on an unchanged line is invalid.
 
 ### 🛡️ STRICT SELF-CORRECTION & GROUNDING RULES (DO THIS FIRST):
 {verifier_grounding_rules}
@@ -742,8 +754,66 @@ Checklist: {checklist}
                     print(f"⚠️ VERIFIER OUTPUT MISSING 'markdown_report'. Keys found: {list(v_data.keys())}")
                     print(f"RAW JSON:\n{json.dumps(v_data, indent=2)}")
 
-            # 5. Extract Valid Diff Line Numbers
-            valid_lines_map = DiffParser.parse_valid_lines(diff)
+            # 5. Filter Verified Findings and Re-synthesize Report if needed
+            verified_findings = v_data.get('verified_findings', [])
+            filtered_findings = []
+            excluded_findings = []
+            
+            if isinstance(verified_findings, list):
+                for f in verified_findings:
+                    if not isinstance(f, dict):
+                        continue
+                    path = f.get('path')
+                    line = f.get('line')
+                    if path and line:
+                        try:
+                            line_num = int(line)
+                            normalized_path = path.strip().lstrip('./').lstrip('/')
+                            if normalized_path in valid_lines_map and line_num in valid_lines_map[normalized_path]:
+                                filtered_findings.append(f)
+                            else:
+                                excluded_findings.append(f)
+                        except Exception:
+                            excluded_findings.append(f)
+                    else:
+                        excluded_findings.append(f)
+
+            if len(excluded_findings) > 0:
+                print(f"ℹ️ {len(excluded_findings)} findings fell outside the diff and will be excluded to reduce noise.")
+                v_data['verified_findings'] = filtered_findings
+                
+                # Check if no findings are left
+                if not filtered_findings:
+                    v_data['merge_verdict'] = "🟢 LGTM"
+                    v_data['markdown_report'] = "> [!NOTE]\n> ### 🟢 **Merge Verdict: LGTM**\n> This PR introduces **0 issues** and is compliant with all architectural and code quality rules."
+                else:
+                    # Re-synthesize the report using the LLM to remove the excluded findings
+                    print("🔄 Re-synthesizing review report to exclude out-of-diff findings...")
+                    re_synth_prompt = f"""You are a context-aware PR review editor.
+We have analyzed a PR, but some of the reported findings were on unchanged lines and have been filtered out.
+
+Original JSON report:
+{json.dumps(v_data, indent=2)}
+
+We have kept only these verified findings:
+{json.dumps(filtered_findings, indent=2)}
+
+Please regenerate the 'markdown_report' and update the 'merge_verdict' so that:
+1. Any mentions of the filtered-out/excluded findings (issues not present in the kept findings list) are completely removed from the report.
+2. The alert block header is updated to accurately count the remaining critical, major, and minor issues/warnings.
+3. The Definition of Done (DoD) checks are updated to reflect the new counts.
+4. If there are 0 findings remaining, update the verdict to '🟢 LGTM' and write a warm appreciation message as required by the formatting guide.
+
+Return ONLY a JSON object matching this structure:
+{{
+  "markdown_report": "Updated Markdown report text",
+  "merge_verdict": "🟢 LGTM | 🟡 Needs Review | 🔴 HARD STOP"
+}}
+"""
+                    cleaned_res = self.llm.get_completion(re_synth_prompt, is_json=True)
+                    if cleaned_res and isinstance(cleaned_res, dict):
+                        v_data['markdown_report'] = cleaned_res.get('markdown_report', v_data['markdown_report'])
+                        v_data['merge_verdict'] = cleaned_res.get('merge_verdict', v_data['merge_verdict'])
 
             # 6. Bundle Inline Comments
             bundled_comments = []
@@ -923,7 +993,7 @@ if __name__ == "__main__":
     pr_num_env = os.getenv("PR_NUMBER")
     gh_token = os.getenv("GITHUB_TOKEN") or os.getenv("TOKEN_GH")
     gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("ANOTHER_API_KEY")
-    model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    model = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
 
     if not all([repo_env, pr_num_env, gh_token, gemini_key]):
         print("❌ Missing required environment variables (REPO, PR_NUMBER, GITHUB_TOKEN, GEMINI_API_KEY).")
