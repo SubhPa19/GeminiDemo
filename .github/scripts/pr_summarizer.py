@@ -29,7 +29,7 @@ from typing import Any, Optional, Dict, Set, List
 # ==============================================================================
 # SCRIPT METADATA & CONSTANTS
 # ==============================================================================
-SCRIPT_VERSION = "2.4.20"
+SCRIPT_VERSION = "2.4.21"
 BOT_MARKER = f"<!-- gemini-bot-review-v{SCRIPT_VERSION} -->"
 
 # ==============================================================================
@@ -88,6 +88,8 @@ class GeminiClient(LLMClient):
                 return text
             except Exception as e:
                 print(f"⚠️ Gemini request attempt {attempt+1} failed: {e}")
+                if 'res' in locals() and res is not None:
+                    print(f"   API Response: {res.text}")
                 time.sleep(2 ** attempt + 1)
         return None
 
@@ -991,7 +993,7 @@ if __name__ == "__main__":
     pr_num_env = os.getenv("PR_NUMBER")
     gh_token = os.getenv("GITHUB_TOKEN") or os.getenv("TOKEN_GH")
     gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("ANOTHER_API_KEY")
-    model = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
+    model = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
 
     if not all([repo_env, pr_num_env, gh_token, gemini_key]):
         print("❌ Missing required environment variables (REPO, PR_NUMBER, GITHUB_TOKEN, GEMINI_API_KEY).")
