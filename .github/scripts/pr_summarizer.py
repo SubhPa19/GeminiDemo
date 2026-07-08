@@ -703,15 +703,11 @@ class PRReviewOrchestrator:
                     if isinstance(raw_str, str):
                         json_match = re.search(r'<json_findings>(.*?)</json_findings>', raw_str, re.DOTALL)
                         if json_match:
-                            extracted = json_match.group(1).strip()
-                            if extracted.startswith("```"):
-                                extracted = re.sub(r'^```(?:json)?\s*', '', extracted)
-                                extracted = re.sub(r'\s*```$', '', extracted)
                             try:
-                                raw_issues = json.loads(extracted)
+                                raw_issues = self.llm._parse_gemini_json(json_match.group(1)) or []
                             except Exception as e:
                                 print(f"⚠️ Failed to parse Hunter JSON from XML tags: {e}")
-                                print(f"Raw extracted text: {extracted}")
+                                print(f"Raw extracted text: {json_match.group(1)}")
                         else:
                             try:
                                 raw_issues = self.llm._parse_gemini_json(raw_str) or []
@@ -785,7 +781,7 @@ Checklist: {checklist}
             v_data = self.llm.get_completion(verifier_prompt, is_json=True, enable_tools=False)
             if not v_data or not isinstance(v_data, dict):
                 print("⚠️ Verifier returned invalid JSON. Attempting fallback...")
-                v_data = {'verified_findings': [], 'merge_verdict': '🟢 LGTM'}
+                v_data = {'verified_findings': [], 'merge_verdict': '⚠️ Analysis Failed'}
             
             # --- 🚀 LAUNCH THE FORMATTER AGENT ---
             print("🎨 Running Formatter Agent...")
