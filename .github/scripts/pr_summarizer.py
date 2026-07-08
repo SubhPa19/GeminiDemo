@@ -419,7 +419,7 @@ class UniversalContextGrabber:
     }
 
     @classmethod
-    def extract_ast_context(cls, filepath: str) -> str:
+    def extract_ast_context(cls, filepath: str, modified_lines: Set[int] = None) -> str:
         if not os.path.exists(filepath): return ""
         _, ext = os.path.splitext(filepath)
         lang = cls.EXT_TO_LANG.get(ext)
@@ -437,11 +437,29 @@ class UniversalContextGrabber:
             def traverse(node):
                 if node.type in ['class_declaration', 'function_declaration', 'method_declaration', 'struct_specifier', 'interface_declaration', 'function_definition']:
                     start_byte = node.start_byte
-                    # Extract the signature (limit to 200 chars to avoid grabbing huge blocks)
-                    code_snippet = code_bytes[start_byte:start_byte+200].decode('utf-8', errors='ignore')
-                    signature = code_snippet.split('{')[0].split('\n')[0].strip()
-                    if signature:
-                        context_lines.append(f"  * Declared in `{os.path.basename(filepath)}`: {signature}")
+                    end_byte = node.end_byte
+                    start_line = node.start_point[0] + 1
+                    end_line = node.end_point[0] + 1
+                    
+                    is_modified = False
+                    if modified_lines:
+                        for line in modified_lines:
+                            if start_line <= line <= end_line:
+                                is_modified = True
+                                break
+
+                    if is_modified and node.type in ['function_declaration', 'method_declaration', 'function_definition']:
+                        # Extract the FULL body for modified functions for data-flow tracking
+                        full_body = code_bytes[start_byte:end_byte].decode('utf-8', errors='ignore')
+                        if len(full_body) > 3000:
+                            full_body = full_body[:3000] + "\n...[truncated body]"
+                        context_lines.append(f"  * Full Modified Function Body in `{os.path.basename(filepath)}`:\n```\n{full_body}\n```")
+                    else:
+                        # Extract just the signature (limit to 200 chars)
+                        code_snippet = code_bytes[start_byte:start_byte+200].decode('utf-8', errors='ignore')
+                        signature = code_snippet.split('{')[0].split('\n')[0].strip()
+                        if signature:
+                            context_lines.append(f"  * Declared in `{os.path.basename(filepath)}`: {signature}")
                 for child in node.children:
                     traverse(child)
                     
@@ -453,16 +471,12 @@ class UniversalContextGrabber:
 
     @classmethod
     def resolve_context(cls, diff_text: str, workspace_root: str = ".") -> str:
-        valid_files = set()
-        for line in diff_text.splitlines():
-            if line.startswith("+++ "):
-                filepath = line[4:].strip().lstrip('b/').lstrip('./').lstrip('/')
-                valid_files.add(filepath)
-
+        valid_lines_map = DiffParser.parse_valid_lines(diff_text)
+        
         ast_results = []
-        for filepath in valid_files:
+        for filepath, lines in valid_lines_map.items():
             full_path = os.path.join(workspace_root, filepath)
-            ctx = cls.extract_ast_context(full_path)
+            ctx = cls.extract_ast_context(full_path, modified_lines=lines)
             if ctx:
                 ast_results.append(ctx)
 
@@ -663,6 +677,7 @@ class PRReviewOrchestrator:
             # 3. Concurrency Stage: Run Summary and Hunter passes in parallel
             print(f"🚀 Starting {domain_name} Parallel Analysis passes (Multi-Pass Voting)...")
             full_file_context = UniversalContextGrabber.resolve_full_files_context(diff, workspace_root=".")
+            codebase_context = UniversalContextGrabber.resolve_context(diff, workspace_root=".")
             with ThreadPoolExecutor(max_workers=4) as executor:
                 summary_prompt = (
                     f"Summarize in one short sentence what this PR titled '{meta['title']}' "
@@ -671,7 +686,7 @@ class PRReviewOrchestrator:
                 )
                 summary_future = executor.submit(self.llm.get_completion, summary_prompt)
                 
-                hunter_prompt = f"{hunter_prompt_extra} Output a JSON array of objects with 'path', 'line', and 'finding'.\n\n{diff}\n{full_file_context}"
+                hunter_prompt = f"{hunter_prompt_extra}\n\nSTRICT DATA-FLOW RULE: You must explicitly trace the lifecycle of all variables modified in the diff down to their final usage/return inside the 'Full Modified Function Body' provided in the context below. If a variable is assigned but never read, or unconditionally overwritten before being used (a dead-store), you MUST flag it as a Logic Bug.\n\nOutput a JSON array of objects with 'path', 'line', and 'finding'.\n\n{diff}\n{codebase_context}\n{full_file_context}"
                 
                 # Spawn 3 independent Hunter agents to vote on findings
                 hunter_futures = [
@@ -693,7 +708,6 @@ class PRReviewOrchestrator:
 
             # 4. Verifier Pass: Synthesize Hunter Findings and the Code
             print(f"🛡️ Starting {domain_name} verification pass...")
-            codebase_context = UniversalContextGrabber.resolve_context(diff, workspace_root=".")
             verifier_prompt = f"""
 You are the {persona}. Verify findings and generate a dual JSON report.
 
