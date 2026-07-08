@@ -998,7 +998,7 @@ if __name__ == "__main__":
     pr_num_env = os.getenv("PR_NUMBER")
     gh_token = os.getenv("GITHUB_TOKEN") or os.getenv("TOKEN_GH")
     gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("ANOTHER_API_KEY")
-    model = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
+    model = "gemini-flash-latest"
 
     if not all([repo_env, pr_num_env, gh_token, gemini_key]):
         print("❌ Missing required environment variables (REPO, PR_NUMBER, GITHUB_TOKEN, GEMINI_API_KEY).")
