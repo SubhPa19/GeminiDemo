@@ -630,11 +630,6 @@ You MUST output EXACTLY one JSON object matching this structure:
     {{
       "path": "path/to/file.kt",
       "line": 123,
-      "chain_of_thought": {{
-        "evidence": "Quote the exact lines from the diff or broader context to determine if this potential issue is valid or invalid.",
-        "broader_context_verification": "Did you verify this against the provided FULL FILE CONTENTS and AST? If the broader context proves this code is safe, OR if you lack sufficient context to be 100% certain it is a bug, you MUST assume it is intentional and drop this finding.",
-        "cross_examination": "Play devil's advocate. What is the strongest argument that this code is actually correct and intentional? If the defense is stronger than the critique, you MUST drop this finding."
-      }},
       "severity": "critical|major|minor",
       "critique": "text",
       "surgical_fix": "code"
