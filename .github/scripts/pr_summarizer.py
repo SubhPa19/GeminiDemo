@@ -703,15 +703,20 @@ class PRReviewOrchestrator:
                     if isinstance(raw_str, str):
                         json_match = re.search(r'<json_findings>(.*?)</json_findings>', raw_str, re.DOTALL)
                         if json_match:
+                            extracted = json_match.group(1).strip()
+                            if extracted.startswith("```"):
+                                extracted = re.sub(r'^```(?:json)?\s*', '', extracted)
+                                extracted = re.sub(r'\s*```$', '', extracted)
                             try:
-                                raw_issues = json.loads(json_match.group(1))
-                            except Exception:
-                                pass
+                                raw_issues = json.loads(extracted)
+                            except Exception as e:
+                                print(f"⚠️ Failed to parse Hunter JSON from XML tags: {e}")
+                                print(f"Raw extracted text: {extracted}")
                         else:
                             try:
-                                raw_issues = json.loads(raw_str)
-                            except Exception:
-                                pass
+                                raw_issues = self.llm._parse_gemini_json(raw_str) or []
+                            except Exception as e:
+                                print(f"⚠️ Failed fallback JSON parsing: {e}")
                     elif isinstance(raw_str, list):
                         raw_issues = raw_str
                     elif isinstance(raw_str, dict):
