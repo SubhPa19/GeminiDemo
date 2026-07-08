@@ -686,11 +686,11 @@ class PRReviewOrchestrator:
                 )
                 summary_future = executor.submit(self.llm.get_completion, summary_prompt)
                 
-                hunter_prompt = f"{hunter_prompt_extra}\n\nSTRICT DATA-FLOW RULE: You must explicitly trace the lifecycle of all variables modified in the diff down to their final usage/return inside the 'Full Modified Function Body' provided in the context below. If a variable is assigned but never read, or unconditionally overwritten before being used (a dead-store), you MUST flag it as a Logic Bug.\n\nOutput a JSON array of objects with 'path', 'line', and 'finding'.\n\n{diff}\n{codebase_context}\n{full_file_context}"
+                hunter_prompt = f"{hunter_prompt_extra}\n\n### 🛠️ YOU ARE AN AGENT (TOOL ACCESS)\nYou have access to tools (`grep_search` and `view_file`). Before outputting the final JSON array of findings, you MUST call tools to investigate cross-file data-flow for any variables or functions whose definition or consumption is not fully visible in the context below.\n\nSTRICT DATA-FLOW RULE: You must explicitly trace the lifecycle of all variables modified in the diff down to their final usage/return inside the 'Full Modified Function Body' provided in the context below. If a variable is assigned but never read, or unconditionally overwritten before being used (a dead-store), you MUST flag it as a Logic Bug.\n\nOutput a JSON array of objects with 'path', 'line', and 'finding'.\n\n{diff}\n{codebase_context}\n{full_file_context}"
                 
-                # Spawn 3 independent Hunter agents to vote on findings
+                # Spawn 3 independent Hunter agents to vote on findings, with full tool access!
                 hunter_futures = [
-                    executor.submit(self.llm.get_completion, hunter_prompt, is_json=True)
+                    executor.submit(self.llm.get_completion, hunter_prompt, is_json=True, enable_tools=True)
                     for _ in range(3)
                 ]
 
