@@ -58,39 +58,129 @@ class GeminiClient(LLMClient):
         self.total_input_tokens = 0
         self.total_output_tokens = 0
 
-    def get_completion(self, prompt: str, is_json: bool = False) -> Any:
+    def _execute_tool(self, name: str, args: dict) -> dict:
+        try:
+            if name == "grep_search":
+                query = args.get("query", "")
+                print(f"🔧 Tool Call: grep_search('{query}')")
+                result = subprocess.run(["git", "grep", "-n", query], capture_output=True, text=True, cwd=".")
+                output = result.stdout
+                if len(output) > 5000:
+                    output = output[:5000] + "\n...[truncated]"
+                return {"result": output if output else "No matches found."}
+            elif name == "view_file":
+                filepath = args.get("filepath", "")
+                print(f"🔧 Tool Call: view_file('{filepath}')")
+                if not os.path.exists(filepath):
+                    return {"error": f"File {filepath} not found."}
+                with open(filepath, "r", encoding="utf-8") as f:
+                    content = f.read()
+                if len(content) > 10000:
+                    content = content[:10000] + "\n...[truncated]"
+                return {"result": content}
+            else:
+                return {"error": f"Unknown tool: {name}"}
+        except Exception as e:
+            return {"error": str(e)}
+
+    def get_completion(self, prompt: str, is_json: bool = False, enable_tools: bool = False) -> Any:
         """
-        Sends content generation request to Gemini API and parses response.
+        Sends content generation request to Gemini API and handles tool calling loops.
         """
-        payload = {"contents": [{"parts": [{"text": prompt}]}]}
+        contents = [{"role": "user", "parts": [{"text": prompt}]}]
+        payload = {"contents": contents}
+        
         if is_json:
-            payload["generationConfig"] = {
-                "response_mime_type": "application/json"
-            }
+            payload["generationConfig"] = {"response_mime_type": "application/json"}
+            
+        if enable_tools:
+            payload["tools"] = [{
+                "functionDeclarations": [
+                    {
+                        "name": "grep_search",
+                        "description": "Searches the codebase using git grep to find references, function calls, or variable definitions across the entire repository. This allows you to verify if a function is called elsewhere.",
+                        "parameters": {
+                            "type": "OBJECT",
+                            "properties": {
+                                "query": {"type": "STRING", "description": "The regex or literal string query to search for"}
+                            },
+                            "required": ["query"]
+                        }
+                    },
+                    {
+                        "name": "view_file",
+                        "description": "Reads the complete contents of a specific file in the repository.",
+                        "parameters": {
+                            "type": "OBJECT",
+                            "properties": {
+                                "filepath": {"type": "STRING", "description": "The exact relative path to the file"}
+                            },
+                            "required": ["filepath"]
+                        }
+                    }
+                ]
+            }]
         
         headers = {"Content-Type": "application/json"}
         
-        # Simple retry loop for standard network/transient failures
-        for attempt in range(3):
-            try:
-                res = requests.post(self.gemini_url, json=payload, headers=headers, timeout=180)
-                res.raise_for_status()
-                response_json = res.json()
-                
-                # Track token usage from API metadata
-                usage = response_json.get('usageMetadata', {})
-                self.total_input_tokens += usage.get('promptTokenCount', 0)
-                self.total_output_tokens += usage.get('candidatesTokenCount', 0)
-                
-                text = response_json['candidates'][0]['content']['parts'][0]['text']
-                if is_json:
-                    return self._parse_gemini_json(text)
-                return text
-            except Exception as e:
-                print(f"⚠️ Gemini request attempt {attempt+1} failed: {e}")
-                if 'res' in locals() and res is not None:
-                    print(f"   API Response: {res.text}")
-                time.sleep(2 ** attempt + 1)
+        max_turns = 5 if enable_tools else 1
+        turn = 0
+        
+        while turn < max_turns:
+            turn += 1
+            for attempt in range(3):
+                try:
+                    res = requests.post(self.gemini_url, json=payload, headers=headers, timeout=180)
+                    res.raise_for_status()
+                    response_json = res.json()
+                    
+                    usage = response_json.get('usageMetadata', {})
+                    self.total_input_tokens += usage.get('promptTokenCount', 0)
+                    self.total_output_tokens += usage.get('candidatesTokenCount', 0)
+                    
+                    candidate = response_json['candidates'][0]
+                    message = candidate['content']
+                    parts = message.get('parts', [])
+                    
+                    has_function_call = False
+                    function_responses = []
+                    
+                    for part in parts:
+                        if "functionCall" in part:
+                            has_function_call = True
+                            call = part["functionCall"]
+                            name = call["name"]
+                            args = call.get("args", {})
+                            
+                            result = self._execute_tool(name, args)
+                            
+                            function_responses.append({
+                                "functionResponse": {
+                                    "name": name,
+                                    "response": result
+                                }
+                            })
+                    
+                    if has_function_call:
+                        contents.append({"role": "model", "parts": parts})
+                        contents.append({"role": "function", "parts": function_responses})
+                        payload["contents"] = contents
+                        break # Break retry loop, continue tool loop
+                    else:
+                        text = ""
+                        for part in parts:
+                            if "text" in part:
+                                text += part["text"]
+                        if is_json:
+                            return self._parse_gemini_json(text)
+                        return text
+                except Exception as e:
+                    print(f"⚠️ Gemini request attempt {attempt+1} failed: {e}")
+                    if 'res' in locals() and res is not None:
+                        print(f"   API Response: {res.text}")
+                    time.sleep(2 ** attempt + 1)
+                    if attempt == 2:
+                        return None
         return None
 
     def calculate_cost(self) -> float:
@@ -597,6 +687,15 @@ class PRReviewOrchestrator:
             verifier_prompt = f"""
 You are the {persona}. Verify findings and generate a dual JSON report.
 
+### 🛠️ YOU ARE AN AGENT (TOOL ACCESS)
+You have access to tools (`grep_search` and `view_file`). 
+Before generating the final JSON report, you may call tools to:
+- Verify if a variable/function is used elsewhere in the codebase.
+- Read the implementation of helper functions used in the PR.
+- Investigate the broader architecture to avoid false positives.
+
+Once you have gathered enough information, output the final JSON report.
+
 ### 🏗️ PROJECT-WIDE ARCHITECTURAL & CODING CONSTRAINTS:
 {constraints}
 
@@ -745,7 +844,7 @@ Diff: {diff}
 Findings: {json.dumps(potential_issues, indent=2)}
 Checklist: {checklist}
 """
-            raw_verified_res = self.llm.get_completion(verifier_prompt, is_json=True)
+            raw_verified_res = self.llm.get_completion(verifier_prompt, is_json=True, enable_tools=True)
             v_data = {}
             if isinstance(raw_verified_res, dict):
                 v_data = raw_verified_res
