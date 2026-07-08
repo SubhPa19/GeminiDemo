@@ -630,7 +630,12 @@ You MUST output EXACTLY one JSON object matching this structure:
     {{
       "path": "path/to/file.kt",
       "line": 123,
-      "severity": "critical|major|minor",
+      "chain_of_thought": {{
+        "evidence": "Quote the exact lines from the diff or broader context.",
+        "broader_context_verification": "If the broader context proves this code is safe, OR if you lack sufficient context to be 100% certain it is a bug, you MUST assume it is intentional.",
+        "cross_examination": "Play devil's advocate. What is the strongest argument that this code is intentional? If the defense is stronger than the critique, you MUST set severity to 'invalid'."
+      }},
+      "severity": "critical|major|minor|invalid",
       "critique": "text",
       "surgical_fix": "code"
     }}
@@ -769,7 +774,10 @@ Checklist: {checklist}
                         try:
                             line_num = int(line)
                             normalized_path = path.strip().lstrip('./').lstrip('/')
-                            if normalized_path in valid_lines_map and line_num in valid_lines_map[normalized_path]:
+                            severity = str(f.get('severity', '')).lower()
+                            if severity == 'invalid':
+                                excluded_findings.append(f)
+                            elif normalized_path in valid_lines_map and line_num in valid_lines_map[normalized_path]:
                                 filtered_findings.append(f)
                             else:
                                 excluded_findings.append(f)
