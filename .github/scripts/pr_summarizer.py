@@ -123,7 +123,7 @@ class GeminiClient(LLMClient):
         
         headers = {"Content-Type": "application/json"}
         
-        max_turns = 5 if enable_tools else 1
+        max_turns = 15 if enable_tools else 1
         turn = 0
         
         while turn < max_turns:
