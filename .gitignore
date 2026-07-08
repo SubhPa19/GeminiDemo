@@ -27,8 +27,6 @@ devicestreaming.xml
 .idea/navEditor.xml
 .idea/shelf/
 
-# OS-specific
-.DS_Store
 Thumbs.db
 
 # Logs
