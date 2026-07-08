@@ -127,6 +127,10 @@ class GeminiClient(LLMClient):
         turn = 0
         
         while turn < max_turns:
+            # Force the model to output text/JSON on the final turn by disabling tools
+            if turn == max_turns - 1 and "tools" in payload:
+                del payload["tools"]
+                
             turn += 1
             for attempt in range(3):
                 try:
@@ -389,7 +393,9 @@ class DiffParser:
             elif current_line_new is not None:
                 if line.startswith("\\"): 
                     continue
-                if not line or line[0] in ('+', ' '):
+                if not line or line[0] == ' ':
+                    current_line_new += 1
+                elif line[0] == '+':
                     valid_lines[current_file].add(current_line_new)
                     current_line_new += 1
                 elif line.startswith("-"):
