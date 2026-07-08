@@ -686,11 +686,11 @@ class PRReviewOrchestrator:
                 )
                 summary_future = executor.submit(self.llm.get_completion, summary_prompt)
                 
-                hunter_prompt = f"{hunter_prompt_extra}\n\n### 🛠️ YOU ARE AN AGENT (TOOL ACCESS)\nYou have access to tools (`grep_search` and `view_file`). Before outputting the final JSON array of findings, you MUST call tools to investigate cross-file data-flow for any variables or functions whose definition or consumption is not fully visible in the context below.\n\nSTRICT DATA-FLOW RULE: You must explicitly trace the lifecycle of all variables modified in the diff down to their final usage/return inside the 'Full Modified Function Body' provided in the context below. If a variable is assigned but never read, or unconditionally overwritten before being used (a dead-store), you MUST flag it as a Logic Bug.\n\nOutput a JSON array of objects with 'path', 'line', and 'finding'.\n\n{diff}\n{codebase_context}\n{full_file_context}"
+                hunter_prompt = f"{hunter_prompt_extra}\n\n### 🛠️ YOU ARE AN AGENT (TOOL ACCESS)\nYou have access to tools (`grep_search` and `view_file`). Before outputting the final JSON array of findings, you MUST call tools to investigate cross-file data-flow for any variables or functions whose definition or consumption is not fully visible in the context below.\n\nSTRICT DATA-FLOW RULE: You must explicitly trace the lifecycle of all variables modified in the diff down to their final usage/return inside the 'Full Modified Function Body' provided in the context below. If a variable is assigned but never read, or unconditionally overwritten before being used (a dead-store), you MUST flag it as a Logic Bug.\n\nOutput your findings EXACTLY as a JSON array of objects inside XML tags like this:\n<json_findings>\n[\n  {{\"path\": \"...\", \"line\": 123, \"finding\": \"...\"}}\n]\n</json_findings>\n\n{diff}\n{codebase_context}\n{full_file_context}"
                 
                 # Spawn 3 independent Hunter agents to vote on findings, with full tool access!
                 hunter_futures = [
-                    executor.submit(self.llm.get_completion, hunter_prompt, is_json=True, enable_tools=True)
+                    executor.submit(self.llm.get_completion, hunter_prompt, is_json=False, enable_tools=True)
                     for _ in range(3)
                 ]
 
@@ -698,7 +698,25 @@ class PRReviewOrchestrator:
                 
                 potential_issues = []
                 for future in hunter_futures:
-                    raw_issues = future.result() or []
+                    raw_str = future.result() or ""
+                    raw_issues = []
+                    if isinstance(raw_str, str):
+                        json_match = re.search(r'<json_findings>(.*?)</json_findings>', raw_str, re.DOTALL)
+                        if json_match:
+                            try:
+                                raw_issues = json.loads(json_match.group(1))
+                            except Exception:
+                                pass
+                        else:
+                            try:
+                                raw_issues = json.loads(raw_str)
+                            except Exception:
+                                pass
+                    elif isinstance(raw_str, list):
+                        raw_issues = raw_str
+                    elif isinstance(raw_str, dict):
+                        raw_issues = raw_str
+                    
                     if isinstance(raw_issues, list):
                         potential_issues.extend(raw_issues)
                     elif isinstance(raw_issues, dict):
