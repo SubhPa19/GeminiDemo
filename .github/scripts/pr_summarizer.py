@@ -340,9 +340,9 @@ class GitHubClient:
                 
         diff = "\n".join(filtered_diff_lines)
 
-        if len(diff) > 600000:
-            print("⚠️ Diff too large, truncating to 600,000 characters...")
-            diff = diff[:600000] + "\n\n[Diff truncated for size]"
+        if len(diff) > 400000:
+            print("⚠️ Diff too large, truncating to 400,000 characters...")
+            diff = diff[:400000] + "\n\n[Diff truncated for size]"
         return diff
 
     def fetch_checklist(self, branch: str, checklist_path: str) -> Optional[str]:
@@ -552,9 +552,9 @@ class UniversalContextGrabber:
         markdown_lines.extend(file_contents)
         
         full_text = "\n\n".join(markdown_lines)
-        if len(full_text) > 4000000:
+        if len(full_text) > 2500000:
             print("⚠️ Full file context too large, truncating...")
-            full_text = full_text[:4000000] + "\n\n[Full file context truncated for size]"
+            full_text = full_text[:2500000] + "\n\n[Full file context truncated for size]"
             
         return full_text
 
