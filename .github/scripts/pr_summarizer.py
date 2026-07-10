@@ -339,9 +339,9 @@ class GitHubClient:
                 
         diff = "\n".join(filtered_diff_lines)
 
-        if len(diff) > 60000:
-            print("⚠️ Diff too large, truncating to 60,000 characters...")
-            diff = diff[:60000] + "\n\n[Diff truncated for size]"
+        if len(diff) > 600000:
+            print("⚠️ Diff too large, truncating to 600,000 characters...")
+            diff = diff[:600000] + "\n\n[Diff truncated for size]"
         return diff
 
     def fetch_checklist(self, branch: str, checklist_path: str) -> Optional[str]:
@@ -474,8 +474,8 @@ class UniversalContextGrabber:
                     if is_modified and node.type in ['function_declaration', 'method_declaration', 'function_definition']:
                         # Extract the FULL body for modified functions for data-flow tracking
                         full_body = code_bytes[start_byte:end_byte].decode('utf-8', errors='ignore')
-                        if len(full_body) > 3000:
-                            full_body = full_body[:3000] + "\n...[truncated body]"
+                        if len(full_body) > 15000:
+                            full_body = full_body[:15000] + "\n...[truncated body]"
                         context_lines.append(f"  * Full Modified Function Body in `{os.path.basename(filepath)}`:\n```\n{full_body}\n```")
                     else:
                         # Extract just the signature (limit to 200 chars)
@@ -525,7 +525,7 @@ class UniversalContextGrabber:
                     valid_files.add(filepath)
 
         # SAFETY VALVE: Skip full file context for massive PRs to maintain LLM focus
-        if len(valid_files) > 25:
+        if len(valid_files) > 100:
             print(f"⚠️ Massive PR detected ({len(valid_files)} files). Skipping Full File Context to preserve LLM focus; relying on Diff + AST only.")
             return ""
 
@@ -551,9 +551,9 @@ class UniversalContextGrabber:
         markdown_lines.extend(file_contents)
         
         full_text = "\n\n".join(markdown_lines)
-        if len(full_text) > 400000:
+        if len(full_text) > 4000000:
             print("⚠️ Full file context too large, truncating...")
-            full_text = full_text[:400000] + "\n\n[Full file context truncated for size]"
+            full_text = full_text[:4000000] + "\n\n[Full file context truncated for size]"
             
         return full_text
 
