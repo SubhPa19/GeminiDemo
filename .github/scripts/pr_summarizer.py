@@ -1157,9 +1157,9 @@ Return ONLY a JSON object matching this structure:
             elif "401" in error_str or "403" in error_str:
                 user_friendly_msg = "**Grace is unauthorized.** Please check your repository secrets to ensure Grace's credentials are valid and active."
             elif "429" in error_str:
-                user_friendly_msg = "**Grace is currently at capacity (Quota Exceeded).** The rate limit has been reached. Please try re-running this workflow in a few minutes."
+                user_friendly_msg = "**Grace is currently at capacity (Quota Exceeded).** The rate limit has been reached. Please try re-running this workflow in a few minutes.\n\n💡 **How to re-run:** Scroll to the bottom of this PR, click **Details** next to the failed Grace check, and select **Re-run jobs** > **Re-run failed jobs** in the top right corner."
             elif "JSONDecodeError" in error_str or "parse" in error_str.lower():
-                user_friendly_msg = "**Grace Synthesis Failed.** Grace encountered an internal error while structuring the final review report. Re-running the workflow usually resolves this transient issue."
+                user_friendly_msg = "**Grace Synthesis Failed.** Grace encountered an internal error while structuring the final review report. Re-running the workflow usually resolves this transient issue.\n\n💡 **How to re-run:** Scroll to the bottom of this PR, click **Details** next to the failed Grace check, and select **Re-run jobs** > **Re-run failed jobs** in the top right corner."
                 
             final_msg = f"{user_friendly_msg}\n\n**Diagnostic Details**:\n```\n{error_str}\n```"
             self.gh.post_failure_comment(final_msg)
