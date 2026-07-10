@@ -1,0 +1,12 @@
+name: 'Grace PR Reviewer'
+description: 'AI-powered PR Code Review Engine'
+runs:
+  using: 'composite'
+  steps:
+    - name: Install Python Dependencies
+      run: pip install requests
+      shell: bash
+
+    - name: Run Grace Engine
+      run: python3 ${{ github.action_path }}/.github/scripts/pr_summarizer.py
+      shell: bash
