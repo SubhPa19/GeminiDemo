@@ -522,8 +522,9 @@ class UniversalContextGrabber:
         for line in diff_text.splitlines():
             if line.startswith("+++ "):
                 filepath = line[4:].strip().lstrip('b/').lstrip('./').lstrip('/')
-                if filepath != "dev/null":
-                    valid_files.add(filepath)
+                if filepath != "dev/null" and not any(filepath.endswith(ext) for ext in [".lock", ".svg", ".png", ".jpg", ".jpeg"]):
+                    if "package-lock.json" not in filepath and "yarn.lock" not in filepath and "Podfile.lock" not in filepath:
+                        valid_files.add(filepath)
 
         # SAFETY VALVE: Skip full file context for massive PRs to maintain LLM focus
         if len(valid_files) > 100:
