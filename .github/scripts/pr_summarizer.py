@@ -306,7 +306,7 @@ class GitHubClient:
 
     def fetch_diff(self, url: str) -> str:
         """
-        Fetches the PR's unified diff text. Truncates if it exceeds 60,000 characters.
+        Fetches the PR's unified diff text. Removes lockfiles and truncates if it exceeds 60,000 characters.
         """
         print("💾 Fetching PR diff...")
         headers = self.api_headers.copy()
@@ -315,7 +315,30 @@ class GitHubClient:
         if not res: 
             return ""
         
-        diff = res.text
+        diff_text = res.text
+        
+        # Fast parser to drop lockfile diff blocks
+        filtered_diff_lines = []
+        skip_current_file = False
+        
+        for line in diff_text.splitlines():
+            if line.startswith("diff --git "):
+                parts = line.split(" b/")
+                if len(parts) > 1:
+                    filepath = parts[-1]
+                    if filepath.endswith(".lock") or filepath.endswith("package-lock.json"):
+                        skip_current_file = True
+                        print(f"✂️ Dropping lockfile from diff analysis: {filepath}")
+                    else:
+                        skip_current_file = False
+                else:
+                    skip_current_file = False
+            
+            if not skip_current_file:
+                filtered_diff_lines.append(line)
+                
+        diff = "\n".join(filtered_diff_lines)
+
         if len(diff) > 60000:
             print("⚠️ Diff too large, truncating to 60,000 characters...")
             diff = diff[:60000] + "\n\n[Diff truncated for size]"
