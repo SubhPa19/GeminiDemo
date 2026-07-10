@@ -970,7 +970,7 @@ We have kept only these verified findings:
 Please regenerate the 'markdown_report' and update the 'merge_verdict' so that:
 1. Any mentions of the filtered-out/excluded findings (issues not present in the kept findings list) are completely removed from the report.
 2. The alert block header is updated to accurately count the remaining critical, major, and minor issues/warnings.
-3. The Definition of Done (DoD) checks are updated to reflect the new counts.
+3. The Definition of Done (DoD) checks are updated to reflect the new counts. If there are 0 issues, the FAILED checklist MUST have 0 items. NEVER list passed checks under the FAILED category.
 4. If there are 0 findings remaining, update the verdict to '🟢 LGTM' and write a warm appreciation message as required by the formatting guide.
 
 Return ONLY a JSON object matching this structure:
@@ -1056,6 +1056,14 @@ Return ONLY a JSON object matching this structure:
                     print(f"  📝 Outside-Diff Finding #{i}: {fc[:200]}...")
             
             print(f"Attempting to submit review with {len(bundled_comments)} inline findings and {len(fallback_comments)} general findings...")
+            
+            if os.getenv("DRY_RUN") == "true":
+                print("\n[DRY RUN] Would have posted the following PR review:")
+                print(full_body)
+                print("\n[DRY RUN] Would have posted inline comments:")
+                print(json.dumps(bundled_comments, indent=2))
+                return
+            
             res = self.gh.submit_bundled_review(full_body, github_event, bundled_comments)
             
             # API Fallback Logic: Bundle all comments inside the main review body if inline failed (e.g. 422 errors)
