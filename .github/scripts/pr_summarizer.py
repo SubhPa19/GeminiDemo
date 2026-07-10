@@ -1195,21 +1195,6 @@ Return ONLY a JSON object matching this structure:
 if __name__ == "__main__":
     # Gather workspace context and inputs
     repo_env = os.getenv("REPO")
-    
-    # ---------------------------------------------------------
-    # SECURITY GATE: Allowed Repositories
-    # ---------------------------------------------------------
-    ALLOWED_REPOS = [
-        "gpo-iot/KA-2.0-Android",
-        "gpo-iot/KA-2.0-iOS",
-        "ZPRTOS/ZMASS",
-        "SubhPa19/GeminiDemo"
-    ]
-    if repo_env and repo_env not in ALLOWED_REPOS:
-        print(f"🚫 SECURITY EXCEPTION: Repository '{repo_env}' is not authorized to use the Grace 3.0 Engine.")
-        sys.exit(1)
-    # ---------------------------------------------------------
-
     pr_num_env = os.getenv("PR_NUMBER")
     gh_token = os.getenv("GITHUB_TOKEN") or os.getenv("TOKEN_GH")
     gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("ANOTHER_API_KEY")
