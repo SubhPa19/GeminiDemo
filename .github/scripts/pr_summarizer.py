@@ -882,7 +882,7 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
     You MUST NOT use HTML tables, markdown tables, or `<nobr>` tags anywhere in this section.
     
     **STRICT EMPTY ITEM EXCLUSION RULE**:
-    - If there are no failed checks, you MUST completely omit the '🔴 FAILED' section.
+    - If there are no failed checks, you MUST completely omit the '🔴 FAILED' bullet entirely. NEVER list passed checks under the FAILED category.
     
     **STRICT DOD HIDE RULE**:
     If all DoD checks passed successfully (meaning there are 0 FAILED checklist items, and only PASSED checks exist), you MUST **completely omit the entire '### 🛡️ Definition of Done (DoD)' section** (including the heading and its contents) from the report.
@@ -900,7 +900,7 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
       `* 🟢 **PASSED | [Total Passed Count] Checks:** `[Category 1 Name] [Passed Count 1]` | `[Category 2 Name] [Passed Count 2]` | ...`
       For example: `* 🟢 **PASSED | 11 Checks:** `Security 2` | `Documentation 1` | `PR Quality 3``
     
-    Ensure you output EXACTLY the following structure under the header, dynamically hiding the empty parts based on the rules above:
+    Ensure you output EXACTLY the following structure under the header, dynamically hiding the optional failed bullet if there are 0 failures, and hiding the entire section if everything passed:
     
     ### 🛡️ Definition of Done (DoD)
     
@@ -1042,7 +1042,9 @@ Return ONLY a JSON object matching this structure:
                 parts = markdown_report.split("### 🛡️ Definition of Done (DoD)")
                 prefix = parts[0]
                 dod_content = parts[1]
-                if "🔴" not in dod_content and "🟡" not in dod_content and "FAILED" not in dod_content.upper() and "WARNING" not in dod_content.upper():
+                
+                # Forcibly strip if there are 0 findings overall, or if the LLM output didn't include actual failures
+                if not verified_findings or ("🔴" not in dod_content and "FAILED" not in dod_content.upper() and "WARNING" not in dod_content.upper()):
                     prefix = prefix.rstrip()
                     if prefix.endswith("---"):
                         prefix = prefix[:-3].rstrip()
