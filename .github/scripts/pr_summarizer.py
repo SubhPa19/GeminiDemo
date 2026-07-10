@@ -135,7 +135,8 @@ class GeminiClient(LLMClient):
             for attempt in range(3):
                 try:
                     res = requests.post(self.gemini_url, json=payload, headers=headers, timeout=180)
-                    res.raise_for_status()
+                    if not res.ok:
+                        raise Exception(f"HTTP {res.status_code}: {res.text}")
                     response_json = res.json()
                     
                     usage = response_json.get('usageMetadata', {})
@@ -184,7 +185,7 @@ class GeminiClient(LLMClient):
                         print(f"   API Response: {res.text}")
                     time.sleep(2 ** attempt + 1)
                     if attempt == 2:
-                        return None
+                        raise e
         return None
 
     def calculate_cost(self) -> float:
@@ -373,8 +374,8 @@ class GitHubClient:
         Posts a fallback issue comment if the main review fails to submit.
         """
         url = f"{self.base_url}/issues/{self.pr_number}/comments"
-        body = f"❌ **Review Failure Report**\n\nThe PR summarizer script failed to submit a formal review.\n\n**Error Details**:\n```\n{error_msg}\n```\n\n<br>\n\n<sup>[**Grace-{SCRIPT_VERSION}**](https://docs.google.com/presentation/d/1mN6SBazQFwcmtuBgiGhm184HVhY_CvxWq9t4nZt6mzQ/edit?usp=sharing \"Gemini-powered Review And Code Evaluator\") | [Share Feedback](https://forms.gle/bpRX129ku5YMi9JLA) | [Walkthrough & Guide](https://drive.google.com/file/d/1paA9hswGG1MazQF_0WBvrZD9sKBUscOy/view?usp=drive_link)</sup>\n{BOT_MARKER}"
-        print("🚀 Posting failure comment to PR...")
+        body = f"{error_msg}\n\n<br>\n\n<sup>[**Grace-{SCRIPT_VERSION}**](https://docs.google.com/presentation/d/1mN6SBazQFwcmtuBgiGhm184HVhY_CvxWq9t4nZt6mzQ/edit?usp=sharing \"Gemini-powered Review And Code Evaluator\") | [Share Feedback](https://forms.gle/bpRX129ku5YMi9JLA) | [Walkthrough & Guide](https://drive.google.com/file/d/1paA9hswGG1MazQF_0WBvrZD9sKBUscOy/view?usp=drive_link)</sup>\n{BOT_MARKER}"
+        print("💡 Posting failure comment to PR...")
         return self._safe_request("POST", url, headers=self.api_headers, json={"body": body})
 
 # ==============================================================================
@@ -916,7 +917,7 @@ Checklist: {checklist}
 CRITICAL: Return ONLY the raw markdown text. Do not wrap in markdown code blocks.
 """
             markdown_report = self.llm.get_completion(formatter_prompt, is_json=False, enable_tools=False)
-            v_data['markdown_report'] = markdown_report.strip()
+            v_data['markdown_report'] = markdown_report.strip() if markdown_report else "⚠️ Synthesis Failed."
 
             # 5. Filter Verified Findings and Re-synthesize Report if needed
             verified_findings = v_data.get('verified_findings', [])
@@ -1150,18 +1151,30 @@ Return ONLY a JSON object matching this structure:
             print(f"💥 Fatal error inside pipeline: {e}")
             
             error_str = str(e)
-            user_friendly_msg = "**Grace encountered an unexpected fatal error during analysis.**"
+            user_friendly_msg = "❌ **Grace encountered an unexpected fatal error during analysis.**"
+            is_known_error = False
             
-            if "400" in error_str:
-                user_friendly_msg = "**PR is too large to review.** The total context exceeded Grace's maximum processing limit. Consider breaking this PR into smaller, focused pull requests."
+            if "API_KEY_INVALID" in error_str or "API key not valid" in error_str:
+                user_friendly_msg = "❌ **Configuration Error: Invalid API Key.** The GEMINI_API_KEY stored in this repository's GitHub Actions Secrets is missing or invalid. Please update the repository secrets to enable Grace."
+                is_known_error = True
+            elif "400" in error_str:
+                user_friendly_msg = "❌ **PR is too large to review.** The total context exceeded Grace's maximum processing limit. Consider breaking this PR into smaller, focused pull requests."
+                is_known_error = True
             elif "401" in error_str or "403" in error_str:
-                user_friendly_msg = "**Grace is unauthorized.** Please check your repository secrets to ensure Grace's credentials are valid and active."
+                user_friendly_msg = "❌ **Grace is unauthorized.** Please check your repository secrets to ensure Grace's credentials are valid and active."
+                is_known_error = True
             elif "429" in error_str:
-                user_friendly_msg = "**Grace is currently at capacity (Quota Exceeded).** The rate limit has been reached. Please try re-running this workflow in a few minutes.\n\n💡 **How to re-run:** Scroll to the bottom of this PR, click **Details** next to the failed Grace check, and select **Re-run jobs** > **Re-run failed jobs** in the top right corner."
+                user_friendly_msg = "❌ **Grace is currently at capacity (Quota Exceeded).** The rate limit has been reached. Please try re-running this workflow in a few minutes.\n\n💡 **How to re-run:** Scroll to the bottom of this PR, click **Details** next to the failed Grace check, and select **Re-run jobs** > **Re-run failed jobs** in the top right corner."
+                is_known_error = True
             elif "JSONDecodeError" in error_str or "parse" in error_str.lower():
-                user_friendly_msg = "**Grace Synthesis Failed.** Grace encountered an internal error while structuring the final review report. Re-running the workflow usually resolves this transient issue.\n\n💡 **How to re-run:** Scroll to the bottom of this PR, click **Details** next to the failed Grace check, and select **Re-run jobs** > **Re-run failed jobs** in the top right corner."
+                user_friendly_msg = "❌ **Grace Synthesis Failed.** Grace encountered an internal error while structuring the final review report. Re-running the workflow usually resolves this transient issue.\n\n💡 **How to re-run:** Scroll to the bottom of this PR, click **Details** next to the failed Grace check, and select **Re-run jobs** > **Re-run failed jobs** in the top right corner."
+                is_known_error = True
                 
-            final_msg = f"{user_friendly_msg}\n\n**Diagnostic Details**:\n```\n{error_str}\n```"
+            if is_known_error:
+                final_msg = user_friendly_msg
+            else:
+                final_msg = f"{user_friendly_msg}\n\n<details><summary><b>Diagnostic Details (For Maintainers)</b></summary>\n\n```\n{error_str}\n```\n</details>"
+                
             self.gh.post_failure_comment(final_msg)
             sys.exit(1)
 
