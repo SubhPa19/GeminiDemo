@@ -1016,12 +1016,13 @@ Return ONLY a JSON object matching this structure:
                             continue
 
             # 7. Determine GitHub Event Type
-            verdict = v_data.get('merge_verdict', '🟡 Needs Review')
+            # Parse the ACTUAL verdict written by the Formatter Agent in the markdown report
+            # This prevents desync if the Formatter self-corrects the Verifier's JSON verdict.
+            markdown_report = v_data.get('markdown_report', "⚠️ Analysis report malformed.")
             
-            # Normalize verdict formatting to standard 🟢, 🟡, 🔴 circles
-            if any(x in verdict for x in ["✅", "🟢", "\u2705", "\\u2705"]) or "lgtm" in verdict.lower():
+            if "**Merge Verdict: LGTM**" in markdown_report:
                 verdict = "🟢 LGTM"
-            elif any(x in verdict for x in ["🔴", "stop", "reject"]) or "stop" in verdict.lower():
+            elif "**Merge Verdict: HARD STOP**" in markdown_report:
                 verdict = "🔴 HARD STOP"
             else:
                 verdict = "🟡 Needs Review"
@@ -1035,7 +1036,6 @@ Return ONLY a JSON object matching this structure:
             # 8. Submit Review
             author_mention = f"@{meta['author']}"
             header = f"{author_mention}\n\n"
-            markdown_report = v_data.get('markdown_report', "⚠️ Analysis report malformed.")
             
             # Post-process to remove DoD section if all checks passed
             if "### 🛡️ Definition of Done (DoD)" in markdown_report:
