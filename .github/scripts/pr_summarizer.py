@@ -879,7 +879,7 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
     ---
 
 3. **Failed Sonar Checks (If Applicable)**:
-   If there are any findings that violate a SonarQube rule (based on the checklist), you MUST extract them and place them in a dedicated section titled `### <img src="https://cdn.simpleicons.org/sonarqube" width="20" height="20" align="absmiddle" /> Failed Sonar Checks`. This section MUST be placed immediately after the `Action Required` section (or right below the Top Alert Block if `Action Required` is empty).
+   If there are any findings that violate a SonarQube rule (based on the checklist), you MUST extract them and place them in a dedicated section titled `### [![SonarSource](https://avatars.githubusercontent.com/u/1089278?s=24&v=4)](https://www.sonarsource.com/) Failed Sonar Checks`. This section MUST be placed immediately after the `Action Required` section (or right below the Top Alert Block if `Action Required` is empty).
    - Do NOT include SonarQube findings in the `### 🛠️ Action Required` section.
    - Format each failed Sonar check as a bulleted list exactly like this:
      `* **[Title of check that failed]** | [Severity] | [File Name](../blob/{meta['head_sha']}/Relative_Path), Line [Line Number]`
