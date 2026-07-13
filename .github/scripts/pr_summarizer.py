@@ -910,10 +910,6 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
     - Format this line under the header exactly as follows (using `|` as the separator between badges, and no parentheses around the count):
       `* 🟢 **PASSED | [Total Passed Count] Checks:** `[Category 1 Name] [Passed Count 1]` | `[Category 2 Name] [Passed Count 2]` | ...`
       For example: `* 🟢 **PASSED | 11 Checks:** `Security 2` | `Documentation 1` | `PR Quality 3``
-
-    **STRICT SONAR CHECKS RULE**:
-    - If the Checklist provided below contains a category/section related to SonarQube (e.g., "SonarQube Code Quality" or "SonarQube"), you must add this bullet: `* 🐬 **Sonar Checks:** [X] Sonar rules configured and evaluated.` (where X is the number of sonar rules in the checklist).
-    - If the Checklist DOES NOT contain any SonarQube rules, you MUST NOT output any Sonar Checks bullet at all.
     
     Ensure you output EXACTLY the following structure under the header, dynamically hiding the optional failed bullet if there are 0 failures:
     
@@ -922,8 +918,6 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
     * 🔴 **FAILED | [Total Failed Count] Checks:** `[Category 1 Name] [Violations Count 1]` | `[Category 2 Name] [Violations Count 2]` | ...
     
     * 🟢 **PASSED | [Total Passed Count] Checks:** `[Category 1 Name] [Passed Count 1]` | `[Category 2 Name] [Passed Count 2]` | ...
-
-    [Optional Sonar Checks Bullet]
 
 
 ---
