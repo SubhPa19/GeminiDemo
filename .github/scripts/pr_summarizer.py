@@ -875,6 +875,13 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
     
     ---
 
+3. **Failed Sonar Checks (If Applicable)**:
+   If there are any findings that violate a SonarQube rule (based on the checklist), you MUST extract them and place them in a dedicated section titled `### 🐬 Failed Sonar Checks` immediately after the `Action Required` section.
+   - Do NOT include SonarQube findings in the `### 🛠️ Action Required` section.
+   - Format each failed Sonar check as a bulleted list exactly like this:
+     `* **[Title of check that failed]** | [Severity] | [File Name](../blob/{meta['head_sha']}/Relative_Path), Line [Line Number]`
+   - If there are no failed Sonar checks, do not print this section.
+
 3. **Definition of Done (DoD) Compliance (Table-Free)**:
     Present the Definition of Done (DoD) compliance checklist as a clean, flat list under '### 🛡️ Definition of Done (DoD)'.
     
@@ -885,7 +892,7 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
     - If there are no failed checks, you MUST completely omit the '🔴 FAILED' bullet entirely. NEVER list passed checks under the FAILED category.
     
     **STRICT DOD HIDE RULE**:
-    If all DoD checks passed successfully (meaning there are 0 FAILED checklist items, and only PASSED checks exist), you MUST **completely omit the entire '### 🛡️ Definition of Done (DoD)' section** (including the heading and its contents) from the report.
+    You MUST ALWAYS display the '### 🛡️ Definition of Done (DoD)' section to show the Sonar Checks status, even if everything passed. NEVER hide this section.
     
     **STRICT CATEGORY GROUPING & AGGREGATION RULE FOR FAILED**:
     - Group categories that contain any failed checks under the header `**🔴 FAILED | [Total Failed Count] Checks:**`.
@@ -899,14 +906,20 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
     - Format this line under the header exactly as follows (using `|` as the separator between badges, and no parentheses around the count):
       `* 🟢 **PASSED | [Total Passed Count] Checks:** `[Category 1 Name] [Passed Count 1]` | `[Category 2 Name] [Passed Count 2]` | ...`
       For example: `* 🟢 **PASSED | 11 Checks:** `Security 2` | `Documentation 1` | `PR Quality 3``
+
+    **STRICT SONAR CHECKS RULE**:
+    - If the Checklist provided below contains a category/section related to SonarQube (e.g., "SonarQube Code Quality" or "SonarQube"), you must add this bullet: `* 🐬 **Sonar Checks:** [X] Sonar rules configured and evaluated.` (where X is the number of sonar rules in the checklist).
+    - If the Checklist DOES NOT contain any SonarQube rules, you MUST NOT output any Sonar Checks bullet at all.
     
-    Ensure you output EXACTLY the following structure under the header, dynamically hiding the optional failed bullet if there are 0 failures, and hiding the entire section if everything passed:
+    Ensure you output EXACTLY the following structure under the header, dynamically hiding the optional failed bullet if there are 0 failures:
     
     ### 🛡️ Definition of Done (DoD)
     
     * 🔴 **FAILED | [Total Failed Count] Checks:** `[Category 1 Name] [Violations Count 1]` | `[Category 2 Name] [Violations Count 2]` | ...
     
     * 🟢 **PASSED | [Total Passed Count] Checks:** `[Category 1 Name] [Passed Count 1]` | `[Category 2 Name] [Passed Count 2]` | ...
+
+    [Optional Sonar Checks Bullet]
 
 
 ---
@@ -1037,18 +1050,7 @@ Return ONLY a JSON object matching this structure:
             author_mention = f"@{meta['author']}"
             header = f"{author_mention}\n\n"
             
-            # Post-process to remove DoD section if all checks passed
-            if "### 🛡️ Definition of Done (DoD)" in markdown_report:
-                parts = markdown_report.split("### 🛡️ Definition of Done (DoD)")
-                prefix = parts[0]
-                dod_content = parts[1]
-                
-                # Forcibly strip if there are 0 findings overall, or if the LLM output didn't include actual failures
-                if not verified_findings or ("🔴" not in dod_content and "FAILED" not in dod_content.upper() and "WARNING" not in dod_content.upper()):
-                    prefix = prefix.rstrip()
-                    if prefix.endswith("---"):
-                        prefix = prefix[:-3].rstrip()
-                    markdown_report = prefix
+            # DoD section is no longer stripped to ensure Sonar check status remains visible.
             
             full_body = header + markdown_report
             
