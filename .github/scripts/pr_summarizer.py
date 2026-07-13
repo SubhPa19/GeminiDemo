@@ -823,10 +823,13 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
    - For '🟢 LGTM', use '> [!NOTE]' and the exact title '> ### 🟢 **Merge Verdict: LGTM**'
    
     **STRICT METRIC BOLDING RULE (For Hard Stop or Needs Review)**:
-    If the verdict is '🔴 HARD STOP' or '🟡 Needs Review', inside the 1-sentence professional justification you MUST explicitly highlight the counts of critical, major, and minor issues/warnings in bold. For example: "This PR introduces **2 critical**, **1 major**, and **2 minor** issues." or similar.
+    If the verdict is '🔴 HARD STOP' or '🟡 Needs Review', inside the 1-sentence professional justification you MUST explicitly highlight the counts of critical, major, and minor issues/warnings in bold (INCLUDING any failed Sonar checks). For example: "This PR introduces **2 critical**, **1 major**, and **2 minor** issues." or similar.
     
     **STRICT LGTM PRAISE RULE (For LGTM)**:
-    If the verdict is '🟢 LGTM' (0 issues), write a warm, highly encouraging, and professional appreciation message. Highlight in bold that the PR introduces **0 issues** or **no issues**. Then, follow it with a clean, bulleted list of 2-3 specific architectural or code quality highlights of the changes (e.g. Robustness, Clean Refactoring, Performance) summarizing what was done well.
+    If the verdict is '🟢 LGTM' (0 issues and 0 failed Sonar checks), write a warm, highly encouraging, and professional appreciation message. Highlight in bold that the PR introduces **0 issues**. Then, follow it with a clean, bulleted list of 2-3 specific architectural or code quality highlights of the changes summarizing what was done well.
+    
+    **STRICT VERDICT CLASSIFICATION RULE**:
+    If there are ANY findings (including Failed Sonar Checks), the verdict MUST be '🔴 HARD STOP' or '🟡 Needs Review', NEVER '🟢 LGTM'.
     
     Structure inside the block (exact markdown):
     > [!CAUTION] (or !WARNING / !NOTE)
@@ -871,16 +874,17 @@ Construct the "markdown_report" to be extremely concise, visual, and action-orie
     #### 🟡 Minor / Warnings
     * **[Issue Category Name]** | [File Name](../blob/{meta['head_sha']}/Relative_Path), Line [Lines]
     
-    Follow this action items section with a divider line (only if issues > 0), ensuring there is an empty line before the divider:
+    Follow this action items section with a divider line (only if non-Sonar issues > 0), ensuring there is an empty line before the divider:
     
     ---
 
 3. **Failed Sonar Checks (If Applicable)**:
-   If there are any findings that violate a SonarQube rule (based on the checklist), you MUST extract them and place them in a dedicated section titled `### 🐬 Failed Sonar Checks` immediately after the `Action Required` section.
+   If there are any findings that violate a SonarQube rule (based on the checklist), you MUST extract them and place them in a dedicated section titled `### 🐬 Failed Sonar Checks`. This section MUST be placed immediately after the `Action Required` section (or right below the Top Alert Block if `Action Required` is empty).
    - Do NOT include SonarQube findings in the `### 🛠️ Action Required` section.
    - Format each failed Sonar check as a bulleted list exactly like this:
      `* **[Title of check that failed]** | [Severity] | [File Name](../blob/{meta['head_sha']}/Relative_Path), Line [Line Number]`
    - If there are no failed Sonar checks, do not print this section.
+   - IMPORTANT: Follow this section with a divider line `---` (ensuring there is an empty line before it).
 
 3. **Definition of Done (DoD) Compliance (Table-Free)**:
     Present the Definition of Done (DoD) compliance checklist as a clean, flat list under '### 🛡️ Definition of Done (DoD)'.
