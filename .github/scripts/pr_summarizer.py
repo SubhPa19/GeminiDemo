@@ -1200,12 +1200,37 @@ if __name__ == "__main__":
     gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("ANOTHER_API_KEY")
     model = "gemini-3.1-pro-preview"
 
-    if not all([repo_env, pr_num_env, gh_token, gemini_key]):
-        print("❌ Missing required environment variables (REPO, PR_NUMBER, GITHUB_TOKEN, GEMINI_API_KEY).")
+    if not all([repo_env, pr_num_env, gh_token]):
+        print("❌ Missing required environment variables (REPO, PR_NUMBER, GITHUB_TOKEN).")
         sys.exit(1)
 
     # 1. Instantiate concrete API dependency clients (SOLID DIP)
     github_client = GitHubClient(repo=repo_env, pr_number=pr_num_env, token=gh_token)
+    
+    # --- DEPRECATION EARLY RETURN ---
+    deprecation_msg = "The GRACe PR bot have been migrated, please contact maintainer of Grace PR bot to get this resolved"
+    
+    # Post the comment directly avoiding the standard failure footer
+    url = f"{github_client.base_url}/issues/{github_client.pr_number}/comments"
+    # Check for existing comment to avoid spamming
+    res = github_client._safe_request("GET", url, headers=github_client.api_headers)
+    already_posted = False
+    if res and res.status_code == 200:
+        for comment in res.json():
+            if deprecation_msg in comment.get("body", ""):
+                already_posted = True
+                break
+                
+    if not already_posted:
+        github_client._safe_request("POST", url, headers=github_client.api_headers, json={"body": deprecation_msg})
+        print("✅ Deprecation message posted.")
+    else:
+        print("Deprecation message already exists.")
+        
+    print("Exiting early due to migration.")
+    sys.exit(0)
+    # --------------------------------
+
     gemini_client = GeminiClient(model_name=model, api_key=gemini_key)
 
     # 2. Inject clients into orchestrator pipeline and run
